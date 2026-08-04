@@ -1,20 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { ThumbsUp, MessageCircle, Send, Image as ImageIcon } from 'lucide-react'
-
-const mockComunicados = [
-  { id: '1', tag: 'ev', tagLabel: 'Evento', autor: 'Comunicação', ini: 'CO', cor: '#1C6DD0', titulo: 'Festa junina da Ideal Empregos 🌽', texto: 'Foi um arraiá e tanto! Obrigado a todos que vieram celebrar com a gente. Ficaram muitas fotos boas do dia.', data: 'Há 2 dias', fotos: [] },
-  { id: '2', tag: 'rh', tagLabel: 'RH', autor: 'RH — Ana Beatriz', ini: 'AB', cor: '#2C5282', titulo: 'Campanha de vacinação 2026', texto: 'Vacina da gripe disponível no ambulatório do 3º andar, de 1 a 10 de julho, das 9h às 17h. Não é necessário agendar.', data: 'Hoje', fotos: [] },
-  { id: '3', tag: 'ev', tagLabel: 'Evento', autor: 'Comunicação', ini: 'CO', cor: '#1C6DD0', titulo: 'Confraternização das equipes', texto: 'Registro do nosso encontro mensal de integração entre os times de operações e comercial.', data: 'Há 1 semana', fotos: [] },
-  { id: '4', tag: 'ti', tagLabel: 'TI', autor: 'TI', ini: 'TI', cor: '#0B2545', titulo: 'Manutenção programada dos sistemas', texto: 'No sábado, das 22h às 02h, o portal e o e-mail ficarão indisponíveis. Planeje-se.', data: 'Há 4 dias', fotos: [] },
-]
+import { ThumbsUp, MessageCircle, Send, Megaphone } from 'lucide-react'
 
 const tagColors: Record<string, { bg: string; color: string }> = {
   rh: { bg: 'var(--info-soft)', color: 'var(--info)' },
   ev: { bg: 'var(--warn-soft)', color: 'var(--warn)' },
   ti: { bg: 'var(--good-soft)', color: 'var(--good)' },
 }
+const tagLabels: Record<string, string> = { rh: 'RH', ev: 'Evento', ti: 'TI' }
 
 export function Comunicados() {
   const { profile, isGestao } = useAuth()
@@ -35,14 +29,15 @@ export function Comunicados() {
   const publish = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!profile) return
-    const { error } = await supabase.from('comunicados').insert({ titulo, conteudo, autor_id: profile.id })
+    const { error } = await supabase.from('comunicados').insert({ titulo, conteudo, categoria: tag, autor_id: profile.id })
     if (error) setMsg('Erro ao publicar.')
     else { setMsg('Publicado!'); setTitulo(''); setConteudo(''); load() }
   }
 
-  const feed = dbLista.length > 0
-    ? dbLista.map(c => ({ id: c.id, tag: 'rh', tagLabel: 'RH', autor: 'Administração', ini: 'AD', cor: '#1C6DD0', titulo: c.titulo, texto: c.conteudo, data: new Date(c.created_at).toLocaleDateString('pt-BR'), fotos: [] }))
-    : mockComunicados
+  const feed = dbLista.map(c => ({
+    id: c.id, tag: c.categoria || 'rh', autor: 'Administração', ini: 'AD', cor: '#1C6DD0',
+    titulo: c.titulo, texto: c.conteudo, data: new Date(c.created_at).toLocaleDateString('pt-BR'),
+  }))
 
   return (
     <div className="page">
@@ -77,14 +72,21 @@ export function Comunicados() {
       )}
 
       <div className="feed">
-        {feed.map(c => {
+        {feed.length === 0 ? (
+          <div className="empty-state">
+            <Megaphone size={32} />
+            <p>Nenhum comunicado publicado ainda.</p>
+            <small>{isAdmin ? 'Use o formulário acima para publicar o primeiro.' : 'Quando o RH publicar algo, aparece aqui.'}</small>
+          </div>
+        ) : feed.map(c => {
           const tc = tagColors[c.tag] || tagColors.rh
+          const label = tagLabels[c.tag] || 'RH'
           return (
             <article key={c.id} className="post section-card">
               <div className="post-head">
                 <div className="post-avatar" style={{ background: c.cor }}>{c.ini}</div>
-                <div className="post-who"><b>{c.autor}</b><small>{c.tagLabel} · {c.data}</small></div>
-                <span className="com-tag" style={{ background: tc.bg, color: tc.color }}>{c.tagLabel}</span>
+                <div className="post-who"><b>{c.autor}</b><small>{label} · {c.data}</small></div>
+                <span className="com-tag" style={{ background: tc.bg, color: tc.color }}>{label}</span>
               </div>
               <h3 className="post-title">{c.titulo}</h3>
               <p className="post-text">{c.texto}</p>

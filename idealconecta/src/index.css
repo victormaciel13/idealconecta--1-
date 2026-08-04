@@ -1061,3 +1061,13 @@ button.btn-ghost:disabled:hover { border-color: var(--line); color: var(--ink); 
 }
 .icon-btn:hover { border-color: var(--primary-2); color: var(--primary-2); background: var(--purple-soft); }
 .icon-btn.danger:hover { border-color: var(--error); color: var(--error); background: var(--error-soft); }
+
+/* Aniversariantes com foto real + remoção pelo admin */
+.bday-photo { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; flex: none; }
+.bday-rail-item { position: relative; }
+.bday-remove {
+  position: absolute; right: 44px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border-radius: 50%; border: 0; background: var(--error-soft); color: var(--error);
+  display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .15s;
+}
+.bday-rail-item:hover .bday-remove { opacity: 1; }

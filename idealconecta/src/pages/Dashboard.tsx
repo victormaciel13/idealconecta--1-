@@ -4,37 +4,48 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
   Umbrella, UserCircle, FileText, Edit3, Heart, Megaphone, Image as ImageIcon,
-  BookOpen, Briefcase, GraduationCap, Rocket
+  BookOpen, Briefcase, GraduationCap, Rocket, Plus, X, Upload
 } from 'lucide-react'
 import type { Comunicado, Ferias } from '../types'
 
-const aniversariantes = [
-  { nome: 'Amanda Silva', depto: 'Recursos Humanos', dia: '03/08' },
-  { nome: 'Carlos Eduardo', depto: 'Operações', dia: '08/08' },
-  { nome: 'Juliana Martins', depto: 'Financeiro', dia: '15/08' },
-  { nome: 'Rafael Souza', depto: 'Comercial', dia: '22/08' },
-  { nome: 'Bruna Almeida', depto: 'Marketing', dia: '29/08' },
-]
-const avatarColors = ['#6D28D9','#2D1B69','#8B5CF6','#4C1D95','#7C3AED']
+const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 export function Dashboard() {
   const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
   const [comunicados, setComunicados] = useState<Comunicado[]>([])
   const [proximasFerias, setProximasFerias] = useState<Ferias | null>(null)
   const [fotos, setFotos] = useState<any[]>([])
+  const [aniversariantes, setAniversariantes] = useState<any[]>([])
+  const [showAddAniv, setShowAddAniv] = useState(false)
 
-  useEffect(() => {
+  useEffect(() => { loadAll() }, [profile])
+
+  function loadAll() {
     supabase.from('comunicados').select('*').order('created_at', { ascending: false }).limit(5)
       .then(({ data }) => setComunicados(data || []))
     supabase.from('galeria').select('*').order('created_at', { ascending: false }).limit(4)
       .then(({ data }) => setFotos(data || []))
+    loadAniversariantes()
     if (profile) {
       supabase.from('ferias').select('*').eq('colaborador_id', profile.id).eq('status', 'aprovada')
         .gte('data_inicio', new Date().toISOString().slice(0, 10)).order('data_inicio', { ascending: true }).limit(1)
         .then(({ data }) => setProximasFerias(data?.[0] || null))
     }
-  }, [profile])
+  }
+
+  function loadAniversariantes() {
+    const mesAtual = new Date().getMonth() + 1
+    supabase.from('aniversariantes').select('*').eq('mes', mesAtual).order('dia')
+      .then(({ data }) => setAniversariantes(data || []))
+  }
+
+  const removerAniversariante = async (id: string) => {
+    if (!confirm('Remover esse aniversariante da lista?')) return
+    await supabase.from('aniversariantes').delete().eq('id', id)
+    loadAniversariantes()
+  }
 
   const tempoDeEmpresa = () => {
     if (!profile?.data_admissao) return '—'
@@ -164,17 +175,27 @@ export function Dashboard() {
           <section className="section-card rail-card bday-rail">
             <div className="section-head">
               <h2 className="rail-title">🎉 Aniversariantes do mês</h2>
+              {isAdmin && <button className="link-btn" onClick={() => setShowAddAniv(true)}><Plus size={14} /></button>}
             </div>
-            <div className="bday-rail-list">
-              {aniversariantes.map((b, i) => (
-                <div key={i} className="bday-rail-item">
-                  <div className="bday-av" style={{ background: avatarColors[i % avatarColors.length] }}>{ini(b.nome)}</div>
-                  <div><b>{b.nome}</b><small>{b.depto}</small></div>
-                  <span className="bday-rail-date">{b.dia}</span>
-                </div>
-              ))}
-            </div>
-            <p className="bday-wish">🎉 Parabéns! Desejamos muita saúde e sucesso.</p>
+            {aniversariantes.length === 0 ? (
+              <p className="empty" style={{ fontSize: 13 }}>Nenhum aniversariante cadastrado este mês.</p>
+            ) : (
+              <div className="bday-rail-list">
+                {aniversariantes.map((b) => (
+                  <div key={b.id} className="bday-rail-item">
+                    {b.foto_url ? (
+                      <img src={b.foto_url} alt={b.nome} className="bday-photo" />
+                    ) : (
+                      <div className="bday-av" style={{ background: 'var(--primary-2)' }}>{ini(b.nome)}</div>
+                    )}
+                    <div><b>{b.nome}</b><small>{b.departamento || '—'}</small></div>
+                    <span className="bday-rail-date">{String(b.dia).padStart(2, '0')}/{String(b.mes).padStart(2, '0')}</span>
+                    {isAdmin && <button className="bday-remove" onClick={() => removerAniversariante(b.id)}><X size={13} /></button>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {aniversariantes.length > 0 && <p className="bday-wish">🎉 Parabéns! Desejamos muita saúde e sucesso.</p>}
           </section>
 
           <div className="oportunidades-banner">
@@ -183,6 +204,70 @@ export function Dashboard() {
             <p>Antes de buscar lá fora, a gente cresce aqui dentro.</p>
           </div>
         </div>
+      </div>
+
+      {showAddAniv && <AdicionarAniversarianteModal onClose={() => setShowAddAniv(false)} onCreated={loadAniversariantes} />}
+    </div>
+  )
+}
+
+function AdicionarAniversarianteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [nome, setNome] = useState(''); const [departamento, setDepartamento] = useState('')
+  const [dia, setDia] = useState(''); const [mes, setMes] = useState(String(new Date().getMonth() + 1))
+  const [file, setFile] = useState<File | null>(null)
+  const [enviando, setEnviando] = useState(false); const [erro, setErro] = useState('')
+
+  const salvar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nome || !dia || !mes) return
+    setEnviando(true); setErro('')
+
+    let foto_url: string | null = null
+    if (file) {
+      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error: uploadError } = await supabase.storage.from('aniversariantes').upload(path, file)
+      if (uploadError) { setErro('Erro no upload da foto. Verifique se o bucket "aniversariantes" foi criado (migration_007).'); setEnviando(false); return }
+      const { data: pub } = supabase.storage.from('aniversariantes').getPublicUrl(path)
+      foto_url = pub.publicUrl
+    }
+
+    const { error } = await supabase.from('aniversariantes').insert({
+      nome, departamento: departamento || null, dia: parseInt(dia), mes: parseInt(mes), foto_url,
+    })
+    setEnviando(false)
+    if (error) { setErro('Não foi possível salvar.'); return }
+    onCreated(); onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()}>
+        <h3>Adicionar aniversariante</h3>
+        <form onSubmit={salvar}>
+          <div className="input-group"><label>Nome</label><input value={nome} onChange={e => setNome(e.target.value)} required placeholder="Nome completo" /></div>
+          <div className="input-group"><label>Departamento (opcional)</label><input value={departamento} onChange={e => setDepartamento(e.target.value)} /></div>
+          <div className="form-row">
+            <div className="input-group"><label>Dia</label><input type="number" min={1} max={31} value={dia} onChange={e => setDia(e.target.value)} required /></div>
+            <div className="input-group"><label>Mês</label>
+              <select value={mes} onChange={e => setMes(e.target.value)}>
+                {meses.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="input-group">
+            <label>Foto (opcional)</label>
+            <label className="file-drop">
+              <Upload size={18} />
+              <span>{file ? file.name : 'Clique para escolher uma foto'}</span>
+              <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+            </label>
+          </div>
+          {erro && <p className="form-error">{erro}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn-primary" disabled={enviando}>{enviando ? 'Salvando...' : 'Salvar'}</button>
+          </div>
+        </form>
       </div>
     </div>
   )
