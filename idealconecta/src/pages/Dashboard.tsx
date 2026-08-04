@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -63,16 +63,8 @@ export function Dashboard() {
     <div className="page dash-page">
       <div className="dash-layout">
         <div className="dash-main">
-          {/* Hero banner */}
-          <div className="hero-banner">
-            <div className="hero-banner-text">
-              <span className="hero-eyebrow">Bem-vindo(a) ao</span>
-              <h1>Portal do Colaborador<br/>Ideal Empregos</h1>
-              <p>Tudo o que você precisa, em um só lugar!</p>
-              <button className="btn-accent" onClick={() => navigate('/politicas')}>Saiba mais</button>
-            </div>
-            <div className="hero-dots"><span className="dot active" /><span className="dot" /><span className="dot" /><span className="dot" /></div>
-          </div>
+          {/* Hero banner — carrossel real quando há conteúdo pra rotacionar */}
+          <HeroCarousel comunicados={comunicados} aniversariantes={aniversariantes} />
 
           {/* Stat cards */}
           <div className="info-cards-row">
@@ -207,6 +199,75 @@ export function Dashboard() {
       </div>
 
       {showAddAniv && <AdicionarAniversarianteModal onClose={() => setShowAddAniv(false)} onCreated={loadAniversariantes} />}
+    </div>
+  )
+}
+
+// Carrossel do banner principal — só rotaciona quando há mais de um slide com
+// conteúdo real (comunicado recente, aniversariantes do mês). Com apenas o
+// slide de boas-vindas, os pontinhos nem aparecem.
+function HeroCarousel({ comunicados, aniversariantes }: { comunicados: Comunicado[]; aniversariantes: any[] }) {
+  const navigate = useNavigate()
+
+  const slides = useMemo(() => {
+    const s: Array<{ type: 'welcome' } | { type: 'comunicado'; data: Comunicado } | { type: 'aniversario'; data: any[] }> = [
+      { type: 'welcome' },
+    ]
+    if (comunicados.length > 0) s.push({ type: 'comunicado', data: comunicados[0] })
+    if (aniversariantes.length > 0) s.push({ type: 'aniversario', data: aniversariantes })
+    return s
+  }, [comunicados, aniversariantes])
+
+  const [idx, setIdx] = useState(0)
+
+  useEffect(() => {
+    if (idx >= slides.length) setIdx(0)
+  }, [slides.length, idx])
+
+  useEffect(() => {
+    if (slides.length < 2) return
+    const t = setInterval(() => setIdx(i => (i + 1) % slides.length), 6000)
+    return () => clearInterval(t)
+  }, [slides.length])
+
+  const slide = slides[idx] || slides[0]
+
+  return (
+    <div className="hero-banner">
+      <div className="hero-banner-text">
+        {slide.type === 'welcome' && (
+          <>
+            <span className="hero-eyebrow">Bem-vindo(a) ao</span>
+            <h1>Portal do Colaborador<br />Ideal Empregos</h1>
+            <p>Tudo o que você precisa, em um só lugar!</p>
+            <button className="btn-accent" onClick={() => navigate('/politicas')}>Saiba mais</button>
+          </>
+        )}
+        {slide.type === 'comunicado' && (
+          <>
+            <span className="hero-eyebrow">📣 Comunicado recente</span>
+            <h1>{slide.data.titulo}</h1>
+            <p>{slide.data.conteudo.length > 120 ? `${slide.data.conteudo.slice(0, 120)}...` : slide.data.conteudo}</p>
+            <button className="btn-accent" onClick={() => navigate('/comunicados')}>Ver comunicados</button>
+          </>
+        )}
+        {slide.type === 'aniversario' && (
+          <>
+            <span className="hero-eyebrow">🎉 Aniversariantes do mês</span>
+            <h1>{slide.data.length === 1 ? slide.data[0].nome : `${slide.data.length} colaboradores fazem aniversário`}</h1>
+            <p>Desejamos muita saúde e sucesso a quem está de aniversário!</p>
+            <button className="btn-accent" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Ver na lateral →</button>
+          </>
+        )}
+      </div>
+
+      {slides.length > 1 && (
+        <div className="hero-dots">
+          {slides.map((_, i) => (
+            <button key={i} className={`dot ${i === idx ? 'active' : ''}`} onClick={() => setIdx(i)} aria-label={`Slide ${i + 1}`} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
