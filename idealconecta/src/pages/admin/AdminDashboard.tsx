@@ -3,7 +3,7 @@ import { useNavigate, Outlet, NavLink } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
-  Users, Megaphone, CheckSquare, Award, GraduationCap, BookOpen,
+  Users, Megaphone, CheckSquare, Award, GraduationCap, BookOpen, Target,
   Image, BarChart3, LogOut, Home
 } from 'lucide-react'
 
@@ -13,6 +13,7 @@ const adminLinks = [
   { to: '/admin/comunicados', icon: Megaphone, label: 'Comunicados' },
   { to: '/admin/aprovacoes', icon: CheckSquare, label: 'Aprovação de Férias' },
   { to: '/admin/reconhecimentos', icon: Award, label: 'Reconhecimentos' },
+  { to: '/admin/pdi', icon: Target, label: 'PDI' },
   { to: '/admin/treinamentos', icon: GraduationCap, label: 'Treinamentos' },
   { to: '/admin/treinamentos-acessos', icon: BarChart3, label: 'Acessos aos Treinamentos' },
   { to: '/admin/galeria', icon: Image, label: 'Galeria' },

@@ -19,6 +19,8 @@ import { AdminLogin } from './pages/admin/AdminLogin'
 import { AdminLayout, AdminHome } from './pages/admin/AdminDashboard'
 import { AdminColaboradores } from './pages/admin/AdminColaboradores'
 import { AdminTreinamentoAcessos } from './pages/admin/AdminTreinamentoAcessos'
+import { PDIHome } from './pages/pdi/PDIHome'
+import { AdminPDI } from './pages/admin/AdminPDI'
 
 export default function App() {
   return (
@@ -28,7 +30,7 @@ export default function App() {
       <Route path="/admin/login" element={<AdminLogin />} />
 
       {/* Admin Panel */}
-      <Route path="/admin" element={<ProtectedRoute requireGestao><AdminLayout /></ProtectedRoute>}>
+      <Route path="/admin" element={<ProtectedRoute requireGestao loginPath="/admin/login"><AdminLayout /></ProtectedRoute>}>
         <Route index element={<AdminHome />} />
         <Route path="colaboradores" element={<AdminColaboradores />} />
         <Route path="comunicados" element={<Comunicados />} />
@@ -36,6 +38,7 @@ export default function App() {
         <Route path="reconhecimentos" element={<Reconhecimentos />} />
         <Route path="treinamentos" element={<Treinamentos />} />
         <Route path="treinamentos-acessos" element={<AdminTreinamentoAcessos />} />
+        <Route path="pdi" element={<AdminPDI />} />
         <Route path="galeria" element={<Galeria />} />
         <Route path="politicas" element={<Politicas />} />
       </Route>
@@ -53,6 +56,7 @@ export default function App() {
         <Route path="treinamentos" element={<Treinamentos />} />
         <Route path="reconhecimentos" element={<Reconhecimentos />} />
         <Route path="cargos" element={<DescricaoCargos />} />
+        <Route path="pdi" element={<PDIHome />} />
         <Route path="politicas" element={<Politicas />} />
       </Route>
     </Routes>
