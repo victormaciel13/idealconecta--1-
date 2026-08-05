@@ -119,8 +119,8 @@ export function Topbar() {
               <div className="topbar-panel-head"><b>Precisa de ajuda?</b></div>
               <div style={{ padding: '14px 16px' }}>
                 <p className="text-muted" style={{ fontSize: 13, marginBottom: 10 }}>Fale com o RH pelos canais oficiais:</p>
-                <p style={{ fontSize: 13, margin: '4px 0' }}>📧 rh@idealempregos.com.br</p>
-                <p style={{ fontSize: 13, margin: '4px 0' }}>📞 (11) 0000-0000</p>
+                <p style={{ fontSize: 13, margin: '4px 0' }}>Fale com seu Gestor 😁</p>
+              
               </div>
             </div>
           )}
