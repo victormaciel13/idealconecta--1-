@@ -199,3 +199,39 @@ export function gerarPoliticaPDF(titulo: string, categoria: string, conteudo: st
   footer(doc)
   doc.save(`${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`)
 }
+
+export function gerarCargoPDF(titulo: string, departamento: string, descricao: string, requisitos?: string | null) {
+  const doc = new jsPDF()
+  header(doc, `Descrição de Cargo — ${departamento}`)
+
+  let y = 42
+  doc.setFontSize(16)
+  doc.setFont('helvetica', 'bold')
+  const tituloLinhas = doc.splitTextToSize(titulo, 180)
+  doc.text(tituloLinhas, 14, y)
+  y += tituloLinhas.length * 7.5 + 10
+
+  const escreverBloco = (rotulo: string, texto: string) => {
+    doc.setFontSize(11)
+    doc.setFont('helvetica', 'bold')
+    if (y > 275) { doc.addPage(); y = 20 }
+    doc.text(rotulo, 14, y)
+    y += 6
+    doc.setFontSize(10)
+    doc.setFont('helvetica', 'normal')
+    const paragrafos = texto.split('\n').filter(p => p.trim())
+    for (const p of paragrafos) {
+      const linhas = doc.splitTextToSize(p, 180)
+      if (y + linhas.length * 5.5 > 275) { doc.addPage(); y = 20 }
+      doc.text(linhas, 14, y)
+      y += linhas.length * 5.5 + 4
+    }
+    y += 6
+  }
+
+  escreverBloco('Descrição das atividades', descricao)
+  if (requisitos && requisitos.trim()) escreverBloco('Requisitos', requisitos)
+
+  footer(doc)
+  doc.save(`${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`)
+}
