@@ -1,21 +1,49 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Search, Bell, MessageCircle, HelpCircle } from 'lucide-react'
+import { Search, Bell, MessageCircle, HelpCircle, CheckCheck } from 'lucide-react'
 
 export function Topbar() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [busca, setBusca] = useState('')
   const [unread, setUnread] = useState(0)
+  const [notifs, setNotifs] = useState<any[]>([])
+  const [showNotifs, setShowNotifs] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
+  const notifRef = useRef<HTMLDivElement>(null)
+  const helpRef = useRef<HTMLDivElement>(null)
 
+  useEffect(() => { if (profile) loadNotifs() }, [profile])
+
+  async function loadNotifs() {
+    const { data } = await supabase.from('notificacoes').select('*').eq('destinatario_id', profile!.id).order('created_at', { ascending: false }).limit(15)
+    setNotifs(data || [])
+    setUnread((data || []).filter(n => !n.lida).length)
+  }
+
+  // Fecha os dropdowns ao clicar fora deles
   useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      const target = e.target as Node
+      if (notifRef.current && !notifRef.current.contains(target)) setShowNotifs(false)
+      if (helpRef.current && !helpRef.current.contains(target)) setShowHelp(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const marcarLida = async (id: string) => {
+    await supabase.from('notificacoes').update({ lida: true }).eq('id', id)
+    loadNotifs()
+  }
+
+  const marcarTodasLidas = async () => {
     if (!profile) return
-    supabase.from('notificacoes').select('id', { count: 'exact', head: true })
-      .eq('destinatario_id', profile.id).eq('lida', false)
-      .then(({ count }) => setUnread(count ?? 0))
-  }, [profile])
+    await supabase.from('notificacoes').update({ lida: true }).eq('destinatario_id', profile.id).eq('lida', false)
+    loadNotifs()
+  }
 
   const greeting = () => {
     const h = new Date().getHours()
@@ -24,7 +52,6 @@ export function Topbar() {
 
   const submitSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    // Simple keyword router — expand as more pages are indexed
     const q = busca.toLowerCase()
     if (q.includes('férias') || q.includes('ferias')) navigate('/ferias')
     else if (q.includes('holerite')) navigate('/holerite')
@@ -48,12 +75,56 @@ export function Topbar() {
       </form>
 
       <div className="topbar-actions">
-        <button className="topbar-icon-btn" onClick={() => navigate('/notificacoes')} title="Notificações">
-          <Bell size={20} />
-          {unread > 0 && <span className="topbar-badge">{unread}</span>}
-        </button>
-        <button className="topbar-icon-btn" title="Mensagens"><MessageCircle size={20} /></button>
-        <button className="topbar-icon-btn" title="Ajuda"><HelpCircle size={20} /></button>
+        <div className="topbar-popper" ref={notifRef}>
+          <button className="topbar-icon-btn" onClick={() => { setShowNotifs(s => !s); setShowHelp(false) }} title="Notificações">
+            <Bell size={20} />
+            {unread > 0 && <span className="topbar-badge">{unread}</span>}
+          </button>
+          {showNotifs && (
+            <div className="topbar-panel">
+              <div className="topbar-panel-head">
+                <b>Notificações</b>
+                {unread > 0 && <button className="link-btn" onClick={marcarTodasLidas}><CheckCheck size={13} /> Marcar todas como lidas</button>}
+              </div>
+              {notifs.length === 0 ? (
+                <p className="empty" style={{ padding: '20px 16px' }}>Nenhuma notificação por aqui.</p>
+              ) : (
+                <div className="topbar-panel-list">
+                  {notifs.map(n => (
+                    <button key={n.id} className={`topbar-notif-item ${!n.lida ? 'unread' : ''}`} onClick={() => marcarLida(n.id)}>
+                      {!n.lida && <span className="topbar-notif-dot" />}
+                      <div>
+                        <b>{n.titulo}</b>
+                        {n.mensagem && <p>{n.mensagem}</p>}
+                        <time>{new Date(n.created_at).toLocaleDateString('pt-BR')}</time>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="topbar-popper">
+          <button className="topbar-icon-btn" title="Mensagens (em breve)" disabled><MessageCircle size={20} /></button>
+        </div>
+
+        <div className="topbar-popper" ref={helpRef}>
+          <button className="topbar-icon-btn" onClick={() => { setShowHelp(s => !s); setShowNotifs(false) }} title="Ajuda">
+            <HelpCircle size={20} />
+          </button>
+          {showHelp && (
+            <div className="topbar-panel topbar-panel-help">
+              <div className="topbar-panel-head"><b>Precisa de ajuda?</b></div>
+              <div style={{ padding: '14px 16px' }}>
+                <p className="text-muted" style={{ fontSize: 13, marginBottom: 10 }}>Fale com o RH pelos canais oficiais:</p>
+                <p style={{ fontSize: 13, margin: '4px 0' }}>📧 rh@idealempregos.com.br</p>
+                <p style={{ fontSize: 13, margin: '4px 0' }}>📞 (11) 0000-0000</p>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="topbar-user">
           <div className="topbar-avatar">{profile?.nome?.[0] || profile?.sobrenome?.[0] || '👤'}{profile?.sobrenome?.[0] || ''}</div>
