@@ -12,7 +12,7 @@ type Treinamento = {
 
 const treinamentosReais: Treinamento[] = [
   {
-    titulo: 'NR-11 — Transporte, Movimentação e Armazenagem de Materiais',
+    titulo: 'NR-1 — Transporte, Movimentação e Armazenagem de Materiais',
     cat: 'Compliance', obrigatorio: true, tipo: 'link',
     desc: 'Norma oficial do Ministério do Trabalho para operação segura de empilhadeiras e movimentação de cargas.',
     url: 'https://www.gov.br/trabalho-e-emprego/pt-br/assuntos/inspecao-do-trabalho/seguranca-e-saude-no-trabalho/ctpp-nrs/normas-regulamentadoras-nrs',
