@@ -118,7 +118,6 @@ export function Topbar() {
             <div className="topbar-panel topbar-panel-help">
               <div className="topbar-panel-head"><b>Precisa de ajuda?</b></div>
               <div style={{ padding: '14px 16px' }}>
-                <p className="text-muted" style={{ fontSize: 13, marginBottom: 10 }}>Fale com o RH pelos canais oficiais:</p>
                 <p style={{ fontSize: 13, margin: '4px 0' }}>Fale com seu Gestor 😁</p>
               
               </div>
