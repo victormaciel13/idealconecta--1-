@@ -56,11 +56,11 @@ export function Politicas() {
             <div className="input-group"><label>Título</label><input value={titulo} onChange={e => setTitulo(e.target.value)} required placeholder="Ex: Código de Conduta e Ética" /></div>
             <div className="input-group"><label>Categoria (opcional)</label><input value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ex: RH, Compliance, Institucional..." /></div>
             <div className="input-group">
-              <label>Arquivo PDF</label>
+              <label>Arquivo (PDF ou Word)</label>
               <label className="file-drop">
                 <Upload size={18} />
-                <span>{file ? file.name : 'Clique para escolher um PDF'}</span>
-                <input type="file" accept="application/pdf" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+                <span>{file ? file.name : 'Clique para escolher um PDF ou Word'}</span>
+                <input type="file" accept="application/pdf,.docx" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
               </label>
             </div>
             <button type="submit" className="btn-primary" disabled={enviando || !file}>

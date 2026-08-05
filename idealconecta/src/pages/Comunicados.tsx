@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { ThumbsUp, MessageCircle, Send, Megaphone } from 'lucide-react'
+import { ThumbsUp, MessageCircle, Send, Megaphone, Upload } from 'lucide-react'
 
 const tagColors: Record<string, { bg: string; color: string }> = {
   rh: { bg: 'var(--info-soft)', color: 'var(--info)' },
@@ -11,11 +11,12 @@ const tagColors: Record<string, { bg: string; color: string }> = {
 const tagLabels: Record<string, string> = { rh: 'RH', ev: 'Evento', ti: 'TI' }
 
 export function Comunicados() {
-  const { profile, isGestao } = useAuth()
+  const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [dbLista, setDbLista] = useState<any[]>([])
   const [titulo, setTitulo] = useState(''); const [conteudo, setConteudo] = useState('')
   const [tag, setTag] = useState('rh'); const [msg, setMsg] = useState('')
+  const [file, setFile] = useState<File | null>(null); const [enviando, setEnviando] = useState(false)
   const [likes, setLikes] = useState<Record<string, boolean>>({})
   const [commenting, setCommenting] = useState<string | null>(null)
   const [comment, setComment] = useState('')
@@ -29,14 +30,30 @@ export function Comunicados() {
   const publish = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!profile) return
-    const { error } = await supabase.from('comunicados').insert({ titulo, conteudo, categoria: tag, autor_id: profile.id })
+    setEnviando(true); setMsg('')
+
+    let imagem_url: string | null = null
+    if (file) {
+      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error: uploadError } = await supabase.storage.from('comunicados').upload(path, file)
+      if (uploadError) {
+        setMsg('Erro no upload da imagem. Verifique se o bucket "comunicados" foi criado (migration_009).')
+        setEnviando(false)
+        return
+      }
+      const { data: pub } = supabase.storage.from('comunicados').getPublicUrl(path)
+      imagem_url = pub.publicUrl
+    }
+
+    const { error } = await supabase.from('comunicados').insert({ titulo, conteudo, categoria: tag, imagem_url, autor_id: profile.id })
+    setEnviando(false)
     if (error) setMsg('Erro ao publicar.')
-    else { setMsg('Publicado!'); setTitulo(''); setConteudo(''); load() }
+    else { setMsg('Publicado!'); setTitulo(''); setConteudo(''); setFile(null); load() }
   }
 
   const feed = dbLista.map(c => ({
     id: c.id, tag: c.categoria || 'rh', autor: 'Administração', ini: 'AD', cor: '#1C6DD0',
-    titulo: c.titulo, texto: c.conteudo, data: new Date(c.created_at).toLocaleDateString('pt-BR'),
+    titulo: c.titulo, texto: c.conteudo, imagem: c.imagem_url, data: new Date(c.created_at).toLocaleDateString('pt-BR'),
   }))
 
   return (
@@ -63,8 +80,16 @@ export function Comunicados() {
                 <option value="rh">RH</option><option value="ev">Evento</option><option value="ti">TI</option>
               </select></div>
             <div className="input-group"><label>Mensagem</label><textarea value={conteudo} onChange={e => setConteudo(e.target.value)} rows={3} required placeholder="Conte o que aconteceu..." /></div>
+            <div className="input-group">
+              <label>Imagem (opcional)</label>
+              <label className="file-drop">
+                <Upload size={18} />
+                <span>{file ? file.name : 'Clique para anexar uma imagem'}</span>
+                <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+              </label>
+            </div>
             <div className="pub-actions">
-              <button type="submit" className="btn-primary"><Send size={16} /> Publicar</button>
+              <button type="submit" className="btn-primary" disabled={enviando}><Send size={16} /> {enviando ? 'Publicando...' : 'Publicar'}</button>
             </div>
             {msg && <p className="form-msg">{msg}</p>}
           </form>
@@ -90,6 +115,7 @@ export function Comunicados() {
               </div>
               <h3 className="post-title">{c.titulo}</h3>
               <p className="post-text">{c.texto}</p>
+              {c.imagem && <img src={c.imagem} alt={c.titulo} className="post-image" />}
               <div className="post-foot">
                 <button className={`react-btn ${likes[c.id] ? 'liked' : ''}`} onClick={() => setLikes(l => ({ ...l, [c.id]: !l[c.id] }))}>
                   <ThumbsUp size={17} /> {likes[c.id] ? 'Curtiu' : 'Curtir'}

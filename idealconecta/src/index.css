@@ -1166,3 +1166,6 @@ button.btn-ghost:disabled:hover { border-color: var(--line); color: var(--ink); 
 @media (max-width: 700px) {
   .topbar-panel { position: fixed; top: 64px; right: 10px; left: 10px; width: auto; }
 }
+
+/* Imagem anexada num comunicado */
+.post-image { width: 100%; max-height: 340px; object-fit: cover; border-radius: 12px; margin-top: 10px; display: block; }
