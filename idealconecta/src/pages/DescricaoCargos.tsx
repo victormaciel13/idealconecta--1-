@@ -2,14 +2,13 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { gerarCargoPDF } from '../lib/pdfGenerator'
-import { ChevronDown, ChevronUp, Search, Briefcase, Plus, Download } from 'lucide-react'
+import { Search, Briefcase, Plus, FileText } from 'lucide-react'
 
 export function DescricaoCargos() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [cargos, setCargos] = useState<any[]>([])
   const [busca, setBusca] = useState('')
-  const [aberto, setAberto] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
 
@@ -26,10 +25,9 @@ export function DescricaoCargos() {
   )
   const deptos = [...new Set(filtrados.map(c => c.departamento || 'Outros'))]
 
-  // Se já existir um PDF de verdade anexado (upload manual), baixa ele.
-  // Senão, gera o PDF na hora a partir do texto cadastrado — não precisa
-  // converter Word pra PDF manualmente pra cada cargo.
-  const baixarPDF = (c: any) => {
+  // Se já existir um PDF de verdade anexado (upload manual), abre ele.
+  // Senão, gera o PDF na hora a partir do texto cadastrado.
+  const abrirPDF = (c: any) => {
     if (c.arquivo_url) {
       window.open(c.arquivo_url, '_blank')
     } else {
@@ -42,7 +40,7 @@ export function DescricaoCargos() {
       <div className="page-header-row">
         <div>
           <h1 className="page-title">Descrição de cargos</h1>
-          <p className="page-sub" style={{ marginBottom: 0 }}>Conheça as atribuições de cada cargo — clique para ver detalhes ou baixar o PDF.</p>
+          <p className="page-sub" style={{ marginBottom: 0 }}>Clique num cargo pra abrir o PDF com as atribuições completas.</p>
         </div>
         {isAdmin && <button className="btn-primary" onClick={() => setShowModal(true)}><Plus size={16} /> Novo cargo</button>}
       </div>
@@ -56,23 +54,13 @@ export function DescricaoCargos() {
       ) : deptos.map(depto => (
         <div key={depto}>
           <p className="eyebrow" style={{ marginTop: 24 }}>{depto}</p>
-          <div className="accordion">
+          <div className="cargo-icon-grid">
             {filtrados.filter(c => (c.departamento || 'Outros') === depto).map(c => (
-              <div key={c.id} className={`accordion-item ${aberto === c.id ? 'open' : ''}`}>
-                <button className="accordion-header" onClick={() => setAberto(aberto === c.id ? null : c.id)}>
-                  <div className="acc-left"><Briefcase size={18} /><strong>{c.titulo}</strong></div>
-                  {aberto === c.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                </button>
-                {aberto === c.id && (
-                  <div className="accordion-body">
-                    {c.descricao && <p>{c.descricao}</p>}
-                    {c.requisitos && <><h4>Requisitos</h4><p>{c.requisitos}</p></>}
-                    <button className="btn-ghost" style={{ marginTop: 10 }} onClick={() => baixarPDF(c)}>
-                      <Download size={14} /> Abrir descrição em PDF
-                    </button>
-                  </div>
-                )}
-              </div>
+              <button key={c.id} className="cargo-icon-card" onClick={() => abrirPDF(c)}>
+                <div className="cargo-icon-badge"><Briefcase size={22} /></div>
+                <b>{c.titulo}</b>
+                <span className="cargo-icon-hint"><FileText size={12} /> Abrir PDF</span>
+              </button>
             ))}
           </div>
         </div>
