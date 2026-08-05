@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
-  Umbrella, UserCircle, FileText, Edit3, Heart, Megaphone, Image as ImageIcon,
+  Umbrella, FileText, Edit3, Heart, Megaphone, Image as ImageIcon,
   BookOpen, Briefcase, GraduationCap, Rocket, Plus, X, Upload
 } from 'lucide-react'
 import type { Comunicado, Ferias } from '../types'
@@ -156,7 +156,6 @@ export function Dashboard() {
             <h2 className="rail-title">🚀 Acesso rápido</h2>
             <div className="quick-access-grid">
               <button onClick={() => navigate('/ferias')}><Umbrella size={20} /><span>Solicitar Férias</span></button>
-              <button onClick={() => navigate('/meus-dados')}><UserCircle size={20} /><span>Perfil Profissional</span></button>
               <button onClick={() => navigate('/holerite')}><FileText size={20} /><span>Holerite</span></button>
               <button onClick={() => navigate('/meus-dados')}><Edit3 size={20} /><span>Atualizar Dados</span></button>
               <button onClick={() => navigate('/declaracoes')}><FileText size={20} /><span>Declarações</span></button>
