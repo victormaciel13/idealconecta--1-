@@ -52,7 +52,7 @@ export function Login() {
       <div className="login-left">
         <div className="login-brand">
           <div className="login-logo-box">
-            <img src="/logo-ideal.jpg" alt="Ideal Empregos" className="login-logo-img" />
+            <img src="/logo-ideal.png" alt="Ideal Empregos" className="login-logo-img" />
           </div>
           <h2>IdealConecta<br/>seu portal</h2>
           <p className="login-desc">Férias, holerite, benefícios e comunicados — tudo em um só lugar.</p>
@@ -65,7 +65,7 @@ export function Login() {
       </div>
 
       <div className="login-right">
-        <img src="/logo-ideal.jpg" alt="Ideal Empregos" className="login-mobile-logo" />
+        <img src="/logo-ideal.png" alt="Ideal Empregos" className="login-mobile-logo" />
         <div className="login-card">
           <h3>{mode === 'login' ? 'Área do Colaborador' : 'Primeiro Acesso'}</h3>
           <p className="login-sub">{mode === 'login' ? 'Acesse com seu e-mail e senha.' : 'Crie sua conta para acessar o portal.'}</p>

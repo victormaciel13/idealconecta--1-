@@ -69,7 +69,7 @@ export function AdminLogin() {
       <div className="admin-login-card section-card">
         <div className="admin-login-header">
           <div className="admin-shield"><ShieldCheck size={32} /></div>
-          <img src="/logo-ideal.jpg" alt="Ideal Empregos" className="admin-login-logo" />
+          <img src="/logo-ideal.png" alt="Ideal Empregos" className="admin-login-logo" />
           <h2>Painel Administrativo</h2>
           <p>Acesso restrito a gestores e administradores.</p>
         </div>

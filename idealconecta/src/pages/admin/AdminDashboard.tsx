@@ -30,7 +30,7 @@ export function AdminLayout() {
     <div className="admin-app">
       <aside className="admin-sidebar">
         <div className="admin-brand">
-          <div className="brand-logo-box"><img src="/logo-ideal.jpg" alt="Ideal Empregos" className="brand-logo-img" /></div>
+          <div className="brand-logo-box"><img src="/logo-ideal.png" alt="Ideal Empregos" className="brand-logo-img" /></div>
           <span className="admin-brand-label">Painel Admin</span>
         </div>
         <nav className="admin-nav">

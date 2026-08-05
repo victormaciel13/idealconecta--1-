@@ -26,7 +26,7 @@ export function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-logo-box"><img src="/logo-ideal.jpg" alt="Ideal Empregos" className="brand-logo-img" /></div>
+        <div className="brand-logo-box"><img src="/logo-ideal.png" alt="Ideal Empregos" className="brand-logo-img" /></div>
       </div>
 
       <nav className="nav-links">
