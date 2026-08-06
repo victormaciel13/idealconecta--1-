@@ -26,13 +26,21 @@ export function DescricaoCargos() {
   const deptos = [...new Set(filtrados.map(c => c.departamento || 'Outros'))]
 
   // Se já existir um PDF de verdade anexado (upload manual), abre ele.
-  // Senão, gera o PDF na hora a partir do texto cadastrado.
-  const abrirPDF = (c: any) => {
-    if (c.arquivo_url) {
-      window.open(c.arquivo_url, '_blank')
-    } else {
-      gerarCargoPDF(c.titulo, c.departamento || 'Geral', c.descricao || 'Descrição não cadastrada.', c.requisitos)
-    }
+  // Senão, monta o PDF na hora com a Missão, Responsabilidades e as
+  // competências (Hard/Soft Skills) que estão vinculadas a esse cargo —
+  // as mesmas que aparecem no PDI do colaborador.
+  const abrirPDF = async (c: any) => {
+    if (c.arquivo_url) { window.open(c.arquivo_url, '_blank'); return }
+
+    const { data: competencias } = await supabase.from('competencias').select('nome, tipo').eq('cargo_id', c.id)
+    const hardSkills = (competencias || []).filter(k => k.tipo === 'tecnica').map(k => k.nome)
+    const softSkills = (competencias || []).filter(k => k.tipo === 'comportamental').map(k => k.nome)
+
+    gerarCargoPDF({
+      titulo: c.titulo, departamento: c.departamento || 'Geral',
+      missao: c.descricao || 'Missão não cadastrada.',
+      responsabilidades: c.responsabilidades, hardSkills, softSkills, indicadores: c.indicadores,
+    })
   }
 
   return (
@@ -73,32 +81,53 @@ export function DescricaoCargos() {
 
 function NovoCargoModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [titulo, setTitulo] = useState(''); const [departamento, setDepartamento] = useState('')
-  const [descricao, setDescricao] = useState(''); const [requisitos, setRequisitos] = useState('')
+  const [missao, setMissao] = useState(''); const [responsabilidades, setResponsabilidades] = useState('')
+  const [hardSkills, setHardSkills] = useState(''); const [softSkills, setSoftSkills] = useState('')
+  const [indicadores, setIndicadores] = useState('')
   const [enviando, setEnviando] = useState(false); const [erro, setErro] = useState('')
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!titulo || !departamento || !descricao) return
+    if (!titulo || !departamento || !missao) return
     setEnviando(true); setErro('')
 
-    const { error } = await supabase.from('cargos').insert({ titulo, departamento, descricao, requisitos: requisitos || null })
+    const { data: cargo, error } = await supabase.from('cargos').insert({
+      titulo, departamento, descricao: missao, responsabilidades: responsabilidades || null, indicadores: indicadores || null,
+    }).select().single()
+
+    if (error || !cargo) { setErro('Não foi possível salvar o cargo.'); setEnviando(false); return }
+
+    // Cada linha digitada em Hard/Soft Skills vira uma competência vinculada
+    // a esse cargo — é isso que alimenta o comparativo no PDI do colaborador.
+    const competenciasParaInserir = [
+      ...hardSkills.split('\n').filter(l => l.trim()).map(nome => ({ cargo_id: cargo.id, nome: nome.trim(), tipo: 'tecnica', nivel_esperado: 3 })),
+      ...softSkills.split('\n').filter(l => l.trim()).map(nome => ({ cargo_id: cargo.id, nome: nome.trim(), tipo: 'comportamental', nivel_esperado: 3 })),
+    ]
+    if (competenciasParaInserir.length > 0) {
+      await supabase.from('competencias').insert(competenciasParaInserir)
+    }
+
     setEnviando(false)
-    if (error) { setErro('Não foi possível salvar o cargo.'); return }
     onCreated(); onClose()
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content section-card" onClick={e => e.stopPropagation()}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 620 }}>
         <h3>Novo cargo</h3>
         <form onSubmit={salvar}>
           <div className="form-row">
-            <div className="input-group"><label>Título do cargo</label><input value={titulo} onChange={e => setTitulo(e.target.value)} required placeholder="Ex: Assistente I de RH" /></div>
-            <div className="input-group"><label>Departamento</label><input value={departamento} onChange={e => setDepartamento(e.target.value)} required placeholder="Ex: RH" /></div>
+            <div className="input-group"><label>Título do cargo</label><input value={titulo} onChange={e => setTitulo(e.target.value)} required placeholder="Ex: Analista Comercial JR" /></div>
+            <div className="input-group"><label>Departamento</label><input value={departamento} onChange={e => setDepartamento(e.target.value)} required placeholder="Ex: Comercial" /></div>
           </div>
-          <div className="input-group"><label>Descrição das atividades</label><textarea value={descricao} onChange={e => setDescricao(e.target.value)} rows={5} required placeholder="Cole aqui o texto completo (pode copiar direto do Word)" /></div>
-          <div className="input-group"><label>Requisitos (opcional)</label><textarea value={requisitos} onChange={e => setRequisitos(e.target.value)} rows={3} /></div>
-          <p className="text-muted" style={{ fontSize: 12.5, marginTop: -6, marginBottom: 12 }}>Não precisa anexar PDF — o sistema gera o PDF automaticamente a partir desse texto quando o colaborador clicar em "Abrir descrição em PDF".</p>
+          <div className="input-group"><label>Missão</label><textarea value={missao} onChange={e => setMissao(e.target.value)} rows={3} required /></div>
+          <div className="input-group"><label>Responsabilidades (uma por linha)</label><textarea value={responsabilidades} onChange={e => setResponsabilidades(e.target.value)} rows={4} /></div>
+          <div className="form-row">
+            <div className="input-group"><label>Hard Skills (uma por linha)</label><textarea value={hardSkills} onChange={e => setHardSkills(e.target.value)} rows={4} /></div>
+            <div className="input-group"><label>Soft Skills (uma por linha)</label><textarea value={softSkills} onChange={e => setSoftSkills(e.target.value)} rows={4} /></div>
+          </div>
+          <div className="input-group"><label>Indicadores (um por linha)</label><textarea value={indicadores} onChange={e => setIndicadores(e.target.value)} rows={3} /></div>
+          <p className="text-muted" style={{ fontSize: 12.5, marginTop: -6, marginBottom: 12 }}>Hard e Soft Skills viram competências no PDI dos colaboradores desse cargo automaticamente.</p>
           {erro && <p className="form-error">{erro}</p>}
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
