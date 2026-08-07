@@ -1185,12 +1185,13 @@ button.btn-ghost:disabled:hover { border-color: var(--line); color: var(--ink); 
 .cargo-icon-card b { font-size: 13px; line-height: 1.3; }
 .cargo-icon-hint { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--primary-2); font-weight: 600; }
 
-/* Botão de editar sobreposto no card de cargo (admin) */
-.cargo-icon-card-wrap { position: relative; }
-.cargo-edit-btn {
-  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 8px;
-  background: var(--surface); border: 1px solid var(--line); color: var(--muted);
-  display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .15s;
+/* Botão de upload de PDF por cargo (admin) — sempre visível, não só no hover */
+.cargo-icon-card-wrap { display: flex; flex-direction: column; }
+.cargo-icon-card-wrap .cargo-icon-card { border-radius: var(--radius-sm) var(--radius-sm) 0 0; border-bottom: 0; }
+.cargo-upload-badge {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--purple-soft); color: var(--primary-2); border: 1px solid var(--line);
+  border-top: 0; border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  padding: 8px; font-size: 11.5px; font-weight: 700; cursor: pointer; font-family: inherit;
 }
-.cargo-icon-card-wrap:hover .cargo-edit-btn { opacity: 1; }
-.cargo-edit-btn:hover { border-color: var(--primary-2); color: var(--primary-2); }
+.cargo-upload-badge:hover { background: var(--primary-2); color: #fff; }

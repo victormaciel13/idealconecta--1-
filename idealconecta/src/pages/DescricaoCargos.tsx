@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { gerarCargoPDF } from '../lib/pdfGenerator'
-import { Search, Briefcase, Plus, FileText, Pencil, Upload } from 'lucide-react'
+import { Search, Briefcase, Plus, FileText, Upload } from 'lucide-react'
 
 export function DescricaoCargos() {
   const { profile } = useAuth()
@@ -71,8 +71,8 @@ export function DescricaoCargos() {
                   <span className="cargo-icon-hint"><FileText size={12} /> {c.arquivo_url ? 'Abrir PDF' : 'Ver descrição'}</span>
                 </button>
                 {isAdmin && (
-                  <button className="cargo-edit-btn" title="Editar / anexar PDF" onClick={() => setEditando(c)}>
-                    <Pencil size={13} />
+                  <button className="cargo-upload-badge" title={c.arquivo_url ? 'Trocar PDF' : 'Subir PDF do cargo'} onClick={() => setEditando(c)}>
+                    <Upload size={13} /> {c.arquivo_url ? 'Trocar PDF' : 'Subir PDF'}
                   </button>
                 )}
               </div>
