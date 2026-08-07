@@ -191,14 +191,31 @@ function CompetenciasTab({ profile }: any) {
   const [competencias, setCompetencias] = useState<any[]>([])
   const [niveis, setNiveis] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [cargoEncontrado, setCargoEncontrado] = useState(true)
 
   useEffect(() => { load() }, [profile])
   async function load() {
     setLoading(true)
-    // Competências cadastradas pra qualquer cargo (o RH vincula por cargo; aqui mostramos as gerais + as do cargo do colaborador se houver match por nome)
-    const { data: comp } = await supabase.from('competencias').select('*').order('tipo')
+
+    // Busca as competências vinculadas especificamente ao cargo do
+    // colaborador (casando pelo nome do cargo cadastrado no perfil dele
+    // com o título cadastrado em Descrição de Cargos).
+    let comp: any[] = []
+    if (profile.cargo) {
+      const { data: cargoRow } = await supabase.from('cargos').select('id').ilike('titulo', profile.cargo).maybeSingle()
+      if (cargoRow) {
+        const { data } = await supabase.from('competencias').select('*').eq('cargo_id', cargoRow.id).order('tipo')
+        comp = data || []
+        setCargoEncontrado(true)
+      } else {
+        setCargoEncontrado(false)
+      }
+    } else {
+      setCargoEncontrado(false)
+    }
+
     const { data: niv } = await supabase.from('colaborador_competencias').select('*').eq('colaborador_id', profile.id)
-    setCompetencias(comp || [])
+    setCompetencias(comp)
     setNiveis(niv || [])
     setLoading(false)
   }
@@ -206,6 +223,11 @@ function CompetenciasTab({ profile }: any) {
   const nivelAtual = (compId: string) => niveis.find(n => n.competencia_id === compId)?.nivel_atual || 1
 
   if (loading) return <p className="empty">Carregando...</p>
+  if (!cargoEncontrado) return (
+    <section className="section-card">
+      <p className="empty">Seu cargo ("{profile.cargo || 'não definido'}") ainda não tem competências cadastradas em Descrição de Cargos. Peça ao RH pra vincular as Hard/Soft Skills desse cargo.</p>
+    </section>
+  )
   if (competencias.length === 0) return (
     <section className="section-card">
       <p className="empty">Nenhuma competência cadastrada ainda. O RH pode cadastrar as competências de cada cargo na tela de administração.</p>
