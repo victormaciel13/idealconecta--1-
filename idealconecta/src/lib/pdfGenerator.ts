@@ -200,38 +200,62 @@ export function gerarPoliticaPDF(titulo: string, categoria: string, conteudo: st
   doc.save(`${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`)
 }
 
-export function gerarCargoPDF(titulo: string, departamento: string, descricao: string, requisitos?: string | null) {
+export interface CargoPDFData {
+  titulo: string
+  departamento: string
+  missao: string
+  responsabilidades?: string | null
+  hardSkills?: string[]
+  softSkills?: string[]
+  indicadores?: string | null
+}
+
+export function gerarCargoPDF(d: CargoPDFData) {
   const doc = new jsPDF()
-  header(doc, `Descrição de Cargo — ${departamento}`)
+  header(doc, `Descrição de Cargo — ${d.departamento}`)
 
   let y = 42
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
-  const tituloLinhas = doc.splitTextToSize(titulo, 180)
+  const tituloLinhas = doc.splitTextToSize(d.titulo, 180)
   doc.text(tituloLinhas, 14, y)
   y += tituloLinhas.length * 7.5 + 10
 
-  const escreverBloco = (rotulo: string, texto: string) => {
-    doc.setFontSize(11)
-    doc.setFont('helvetica', 'bold')
-    if (y > 275) { doc.addPage(); y = 20 }
-    doc.text(rotulo, 14, y)
-    y += 6
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    const paragrafos = texto.split('\n').filter(p => p.trim())
-    for (const p of paragrafos) {
+  const checkPage = (altura: number) => { if (y + altura > 275) { doc.addPage(); y = 20 } }
+
+  const escreverTexto = (rotulo: string, texto: string) => {
+    checkPage(14)
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold')
+    doc.text(rotulo, 14, y); y += 6
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    for (const p of texto.split('\n').filter(p => p.trim())) {
       const linhas = doc.splitTextToSize(p, 180)
-      if (y + linhas.length * 5.5 > 275) { doc.addPage(); y = 20 }
-      doc.text(linhas, 14, y)
-      y += linhas.length * 5.5 + 4
+      checkPage(linhas.length * 5.5)
+      doc.text(linhas, 14, y); y += linhas.length * 5.5 + 4
     }
-    y += 6
+    y += 4
   }
 
-  escreverBloco('Descrição das atividades', descricao)
-  if (requisitos && requisitos.trim()) escreverBloco('Requisitos', requisitos)
+  const escreverLista = (rotulo: string, itens: string[]) => {
+    if (!itens || itens.length === 0) return
+    checkPage(14)
+    doc.setFontSize(11); doc.setFont('helvetica', 'bold')
+    doc.text(rotulo, 14, y); y += 7
+    doc.setFontSize(10); doc.setFont('helvetica', 'normal')
+    for (const item of itens) {
+      const linhas = doc.splitTextToSize(`•  ${item}`, 176)
+      checkPage(linhas.length * 5.5)
+      doc.text(linhas, 16, y); y += linhas.length * 5.5 + 2
+    }
+    y += 5
+  }
+
+  escreverTexto('Missão', d.missao)
+  if (d.responsabilidades) escreverLista('Responsabilidades', d.responsabilidades.split('\n').filter(l => l.trim()))
+  if (d.hardSkills && d.hardSkills.length > 0) escreverLista('Hard Skills', d.hardSkills)
+  if (d.softSkills && d.softSkills.length > 0) escreverLista('Soft Skills', d.softSkills)
+  if (d.indicadores) escreverLista('Indicadores', d.indicadores.split('\n').filter(l => l.trim()))
 
   footer(doc)
-  doc.save(`${titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`)
+  doc.save(`${d.titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`)
 }

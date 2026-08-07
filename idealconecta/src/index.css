@@ -1184,3 +1184,13 @@ button.btn-ghost:disabled:hover { border-color: var(--line); color: var(--ink); 
 }
 .cargo-icon-card b { font-size: 13px; line-height: 1.3; }
 .cargo-icon-hint { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--primary-2); font-weight: 600; }
+
+/* Botão de editar sobreposto no card de cargo (admin) */
+.cargo-icon-card-wrap { position: relative; }
+.cargo-edit-btn {
+  position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 8px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--muted);
+  display: grid; place-items: center; cursor: pointer; opacity: 0; transition: opacity .15s;
+}
+.cargo-icon-card-wrap:hover .cargo-edit-btn { opacity: 1; }
+.cargo-edit-btn:hover { border-color: var(--primary-2); color: var(--primary-2); }
