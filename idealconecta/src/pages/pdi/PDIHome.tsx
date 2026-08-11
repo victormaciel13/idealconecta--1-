@@ -375,6 +375,7 @@ function MentoriasTab({ profile }: any) {
   const [mentores, setMentores] = useState<any[]>([])
   const [minhas, setMinhas] = useState<any[]>([])
   const [mentorSelecionado, setMentorSelecionado] = useState<any>(null)
+  const [detalhando, setDetalhando] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [profile])
@@ -388,7 +389,7 @@ function MentoriasTab({ profile }: any) {
 
   if (loading) return <p className="empty">Carregando...</p>
 
-  const statusMentoriaLabel: Record<string, string> = { pendente: 'Pendente', aceita: 'Aceita', recusada: 'Recusada', reagendada: 'Reagendada', concluida: 'Concluída' }
+  const statusMentoriaLabel: Record<string, string> = { pendente: 'Pendente', aceita: 'Aceita', recusada: 'Recusada', reagendada: 'Nova data sugerida', aguardando_info: 'Mentor pediu mais informações', concluida: 'Concluída' }
 
   return (
     <>
@@ -411,25 +412,109 @@ function MentoriasTab({ profile }: any) {
       <section className="section-card" style={{ marginTop: 16 }}>
         <h2>Minhas solicitações</h2>
         {minhas.length === 0 ? <p className="empty">Nenhuma mentoria solicitada ainda.</p> : (
-          <table className="data-table"><thead><tr><th>Mentor</th><th>Tema</th><th>Status</th><th>Data</th></tr></thead>
-            <tbody>{minhas.map(s => (
-              <tr key={s.id}><td>{s.mentor?.nome}</td><td>{s.tema}</td>
-                <td><span className="status-badge">{statusMentoriaLabel[s.status]}</span></td>
-                <td>{new Date(s.created_at).toLocaleDateString('pt-BR')}</td></tr>
-            ))}</tbody></table>
+          <div className="approval-list">
+            {minhas.map(s => (
+              <button key={s.id} className="approval-card approval-card-clickable" onClick={() => setDetalhando(s)}>
+                <div className="approval-header">
+                  <strong>{s.mentor?.nome} · {s.tema}</strong>
+                  <span className="status-badge">{statusMentoriaLabel[s.status]}</span>
+                </div>
+                <span className="text-muted" style={{ fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString('pt-BR')}</span>
+                {s.status === 'reagendada' && s.nova_data_sugerida && <p style={{ fontSize: 13, color: 'var(--primary-2)', margin: '6px 0 0' }}>Mentor sugeriu: {new Date(s.nova_data_sugerida).toLocaleDateString('pt-BR')}</p>}
+                {s.status === 'aguardando_info' && s.mensagem_mentor && <p style={{ fontSize: 13, color: 'var(--warn)', margin: '6px 0 0' }}>"{s.mensagem_mentor}"</p>}
+              </button>
+            ))}
+          </div>
         )}
       </section>
 
       {mentorSelecionado && (
         <SolicitarMentoriaModal profile={profile} mentor={mentorSelecionado} onClose={() => setMentorSelecionado(null)} onCreated={load} />
       )}
+      {detalhando && (
+        <DetalheMentoriaModal solicitacao={detalhando} onClose={() => { setDetalhando(null); load() }} />
+      )}
     </>
+  )
+}
+
+function DetalheMentoriaModal({ solicitacao, onClose }: any) {
+  const [aprendizados, setAprendizados] = useState(solicitacao.aprendizados || '')
+  const [compromissos, setCompromissos] = useState(solicitacao.compromissos || '')
+  const [proximasAcoes, setProximasAcoes] = useState(solicitacao.proximas_acoes || '')
+  const [evidencias, setEvidencias] = useState(solicitacao.evidencias_anotacoes || '')
+  const [avaliacao, setAvaliacao] = useState(solicitacao.avaliacao || 0)
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async () => {
+    setSalvando(true)
+    await supabase.from('mentoria_solicitacoes').update({
+      aprendizados, compromissos, proximas_acoes: proximasAcoes, evidencias_anotacoes: evidencias,
+      avaliacao: avaliacao || null,
+    }).eq('id', solicitacao.id)
+    setSalvando(false)
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <h3>{solicitacao.tema}</h3>
+        <p className="text-muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 16 }}>com {solicitacao.mentor?.nome}</p>
+
+        {solicitacao.nova_data_sugerida && (
+          <div className="alert-box" style={{ marginBottom: 16 }}>
+            <div><b>Nova data sugerida pelo mentor</b><p>{new Date(solicitacao.nova_data_sugerida).toLocaleDateString('pt-BR')}</p></div>
+          </div>
+        )}
+        {solicitacao.mensagem_mentor && (
+          <div className="alert-box" style={{ marginBottom: 16 }}>
+            <div><b>Mensagem do mentor</b><p>{solicitacao.mensagem_mentor}</p></div>
+          </div>
+        )}
+        {solicitacao.orientacoes_mentor && (
+          <section className="section-card" style={{ marginBottom: 16, background: 'var(--purple-soft)', boxShadow: 'none' }}>
+            <b style={{ fontSize: 13 }}>Orientações do mentor</b>
+            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>{solicitacao.orientacoes_mentor}</p>
+          </section>
+        )}
+
+        {(solicitacao.status === 'aceita' || solicitacao.status === 'concluida') && (
+          <>
+            <p className="text-muted" style={{ fontSize: 12.5, marginBottom: 12 }}>Depois da mentoria, registre aqui o que você tirou dela:</p>
+            <div className="input-group"><label>Principais aprendizados</label><textarea value={aprendizados} onChange={e => setAprendizados(e.target.value)} rows={2} /></div>
+            <div className="input-group"><label>Compromissos assumidos</label><textarea value={compromissos} onChange={e => setCompromissos(e.target.value)} rows={2} /></div>
+            <div className="input-group"><label>Próximas ações</label><textarea value={proximasAcoes} onChange={e => setProximasAcoes(e.target.value)} rows={2} /></div>
+            <div className="input-group"><label>Evidências ou anotações</label><textarea value={evidencias} onChange={e => setEvidencias(e.target.value)} rows={2} /></div>
+            <div className="input-group">
+              <label>Avaliação da mentoria</label>
+              <div className="star-rating">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} type="button" className={`star ${n <= avaliacao ? 'filled' : ''}`} onClick={() => setAvaliacao(n)}>★</button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost" onClick={onClose}>Fechar</button>
+              <button type="button" className="btn-primary" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando...' : 'Salvar registro'}</button>
+            </div>
+          </>
+        )}
+        {solicitacao.status === 'pendente' && <p className="empty">Aguardando resposta do mentor.</p>}
+        {solicitacao.status === 'recusada' && <p className="empty">Essa solicitação foi recusada.</p>}
+        {solicitacao.status !== 'aceita' && solicitacao.status !== 'concluida' && solicitacao.status !== 'pendente' && solicitacao.status !== 'recusada' && (
+          <div className="modal-actions"><button type="button" className="btn-ghost" onClick={onClose}>Fechar</button></div>
+        )}
+      </div>
+    </div>
   )
 }
 
 function SolicitarMentoriaModal({ profile, mentor, onClose, onCreated }: any) {
   const [tema, setTema] = useState(''); const [objetivo, setObjetivo] = useState('')
-  const [desafio, setDesafio] = useState(''); const [dataPreferida, setDataPreferida] = useState('')
+  const [desafio, setDesafio] = useState(''); const [competencia, setCompetencia] = useState('')
+  const [relacaoPdi, setRelacaoPdi] = useState('')
+  const [dataPreferida, setDataPreferida] = useState('')
   const [horario, setHorario] = useState(''); const [formato, setFormato] = useState('videochamada')
   const [observacoes, setObservacoes] = useState(''); const [salvando, setSalvando] = useState(false)
 
@@ -438,6 +523,7 @@ function SolicitarMentoriaModal({ profile, mentor, onClose, onCreated }: any) {
     setSalvando(true)
     await supabase.from('mentoria_solicitacoes').insert({
       colaborador_id: profile.id, mentor_id: mentor.id, tema, objetivo, desafio_atual: desafio,
+      competencia_relacionada: competencia || null, relacao_pdi: relacaoPdi || null,
       data_preferida: dataPreferida || null, horario_preferido: horario || null, formato, observacoes,
     })
     setSalvando(false)
@@ -452,6 +538,8 @@ function SolicitarMentoriaModal({ profile, mentor, onClose, onCreated }: any) {
           <div className="input-group"><label>Tema da mentoria</label><input value={tema} onChange={e => setTema(e.target.value)} required /></div>
           <div className="input-group"><label>Objetivo da conversa</label><textarea value={objetivo} onChange={e => setObjetivo(e.target.value)} rows={2} /></div>
           <div className="input-group"><label>Desafio atual</label><textarea value={desafio} onChange={e => setDesafio(e.target.value)} rows={2} /></div>
+          <div className="input-group"><label>Competência que deseja desenvolver</label><input value={competencia} onChange={e => setCompetencia(e.target.value)} placeholder="Ex: Excel, Comunicação..." /></div>
+          <div className="input-group"><label>Relação com o seu PDI</label><textarea value={relacaoPdi} onChange={e => setRelacaoPdi(e.target.value)} rows={2} placeholder="Como essa mentoria se conecta com suas ações de desenvolvimento?" /></div>
           <div className="form-row">
             <div className="input-group"><label>Data preferida</label><input type="date" value={dataPreferida} onChange={e => setDataPreferida(e.target.value)} /></div>
             <div className="input-group"><label>Horário preferido</label><input value={horario} onChange={e => setHorario(e.target.value)} placeholder="Ex: manhã, 14h..." /></div>

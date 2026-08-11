@@ -252,6 +252,7 @@ function MentoriasTab({ equipe, isSoGestor }: { equipe: any[]; isSoGestor: boole
   const [loading, setLoading] = useState(true)
   const [periodoInicio, setPeriodoInicio] = useState('')
   const [periodoFim, setPeriodoFim] = useState('')
+  const [gerenciando, setGerenciando] = useState<any>(null)
 
   useEffect(() => { load() }, [equipe.length])
   async function load() {
@@ -266,13 +267,8 @@ function MentoriasTab({ equipe, isSoGestor }: { equipe: any[]; isSoGestor: boole
     setLoading(false)
   }
 
-  const atualizarStatus = async (id: string, status: string) => {
-    await supabase.from('mentoria_solicitacoes').update({ status }).eq('id', id)
-    load()
-  }
-
-  const statusLabel: Record<string, string> = { pendente: 'Pendente', aceita: 'Aceita', recusada: 'Recusada', reagendada: 'Reagendada', concluida: 'Concluída' }
-  const statusColor: Record<string, string> = { pendente: 'var(--warn)', aceita: 'var(--info)', recusada: 'var(--error)', reagendada: 'var(--muted)', concluida: 'var(--good)' }
+  const statusLabel: Record<string, string> = { pendente: 'Pendente', aceita: 'Aceita', recusada: 'Recusada', reagendada: 'Nova data sugerida', aguardando_info: 'Aguardando informações', concluida: 'Concluída' }
+  const statusColor: Record<string, string> = { pendente: 'var(--warn)', aceita: 'var(--info)', recusada: 'var(--error)', reagendada: 'var(--accent)', aguardando_info: 'var(--warn)', concluida: 'var(--good)' }
 
   const filtradas = solicitacoes.filter(s => {
     if (periodoInicio && s.created_at < periodoInicio) return false
@@ -295,33 +291,115 @@ function MentoriasTab({ equipe, isSoGestor }: { equipe: any[]; isSoGestor: boole
       {filtradas.length === 0 ? <p className="empty">{isSoGestor && equipe.length === 0 ? 'Você ainda não tem colaboradores na sua equipe.' : 'Nenhuma solicitação de mentoria nesse período.'}</p> : (
         <div className="approval-list">
           {filtradas.map(s => (
-            <div key={s.id} className="approval-card">
+            <button key={s.id} className="approval-card approval-card-clickable" onClick={() => setGerenciando(s)}>
               <div className="approval-header">
                 <strong>{s.colaborador?.nome} {s.colaborador?.sobrenome} → {s.mentor?.nome}</strong>
                 <span style={{ color: statusColor[s.status] }}>{statusLabel[s.status]}</span>
               </div>
               <p style={{ fontSize: 13.5, margin: '4px 0 10px' }}><b>Tema:</b> {s.tema}</p>
-              {s.objetivo && <p className="text-muted" style={{ fontSize: 13, margin: '2px 0' }}>{s.objetivo}</p>}
               <div className="pdi-acao-meta" style={{ margin: '8px 0' }}>
                 {s.data_preferida && <span><Calendar size={12} style={{ marginRight: 4 }} />{new Date(s.data_preferida).toLocaleDateString('pt-BR')}</span>}
                 {s.formato && <span style={{ textTransform: 'capitalize' }}>{s.formato}</span>}
               </div>
-              {s.status === 'pendente' && (
-                <div className="approval-actions">
-                  <button className="btn-approve" onClick={() => atualizarStatus(s.id, 'aceita')}>Aceitar</button>
-                  <button className="btn-reject" onClick={() => atualizarStatus(s.id, 'recusada')}>Recusar</button>
-                </div>
-              )}
-              {s.status === 'aceita' && (
-                <div className="approval-actions">
-                  <button className="btn-approve" onClick={() => atualizarStatus(s.id, 'concluida')}>Marcar concluída</button>
-                </div>
-              )}
-            </div>
+              <span className="link-btn" style={{ fontSize: 12.5 }}>Gerenciar →</span>
+            </button>
           ))}
         </div>
       )}
+
+      {gerenciando && <GerenciarMentoriaModal solicitacao={gerenciando} onClose={() => { setGerenciando(null); load() }} />}
     </section>
+  )
+}
+
+function GerenciarMentoriaModal({ solicitacao, onClose }: { solicitacao: any; onClose: () => void }) {
+  const [novaData, setNovaData] = useState('')
+  const [mensagem, setMensagem] = useState(solicitacao.mensagem_mentor || '')
+  const [orientacoes, setOrientacoes] = useState(solicitacao.orientacoes_mentor || '')
+  const [salvando, setSalvando] = useState(false)
+  const [showAcaoPDI, setShowAcaoPDI] = useState(false)
+  const [tituloAcao, setTituloAcao] = useState('')
+
+  const atualizar = async (campos: Record<string, any>) => {
+    setSalvando(true)
+    await supabase.from('mentoria_solicitacoes').update(campos).eq('id', solicitacao.id)
+    setSalvando(false)
+    onClose()
+  }
+
+  const recomendarAcaoPDI = async () => {
+    if (!tituloAcao.trim()) return
+    setSalvando(true)
+    const { data: pdi } = await supabase.from('pdis').select('id').eq('colaborador_id', solicitacao.colaborador_id).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (pdi) {
+      await supabase.from('pdi_acoes').insert({
+        pdi_id: pdi.id, titulo: tituloAcao, descricao: `Recomendada após mentoria: ${solicitacao.tema}`, responsavel: 'Colaborador',
+      })
+    }
+    setSalvando(false)
+    setShowAcaoPDI(false); setTituloAcao('')
+    alert('Ação adicionada ao PDI do colaborador!')
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <h3>Gerenciar mentoria</h3>
+        <p className="text-muted" style={{ fontSize: 13, marginTop: -8, marginBottom: 4 }}>
+          {solicitacao.colaborador?.nome} {solicitacao.colaborador?.sobrenome} · com {solicitacao.mentor?.nome}
+        </p>
+        <p style={{ fontSize: 13.5, marginBottom: 16 }}><b>Tema:</b> {solicitacao.tema}</p>
+
+        {solicitacao.status === 'pendente' && (
+          <div className="mentoria-actions-grid">
+            <button className="btn-approve" onClick={() => atualizar({ status: 'aceita' })}>Aceitar</button>
+            <button className="btn-reject" onClick={() => atualizar({ status: 'recusada' })}>Recusar</button>
+          </div>
+        )}
+
+        <div className="input-group" style={{ marginTop: 16 }}>
+          <label>Sugerir nova data</label>
+          <div className="form-row">
+            <input type="date" value={novaData} onChange={e => setNovaData(e.target.value)} />
+            <button type="button" className="btn-ghost" disabled={!novaData || salvando} onClick={() => atualizar({ status: 'reagendada', nova_data_sugerida: novaData })}>Enviar nova data</button>
+          </div>
+        </div>
+
+        <div className="input-group">
+          <label>Solicitar mais informações / mensagem ao colaborador</label>
+          <textarea value={mensagem} onChange={e => setMensagem(e.target.value)} rows={2} placeholder="Ex: pode detalhar melhor o desafio que quer discutir?" />
+          <button type="button" className="btn-ghost" disabled={!mensagem.trim() || salvando} onClick={() => atualizar({ status: 'aguardando_info', mensagem_mentor: mensagem })}>Enviar solicitação de informações</button>
+        </div>
+
+        <div className="input-group">
+          <label>Orientações do mentor</label>
+          <textarea value={orientacoes} onChange={e => setOrientacoes(e.target.value)} rows={2} placeholder="Registre as orientações passadas na mentoria" />
+          <button type="button" className="btn-ghost" disabled={!orientacoes.trim() || salvando} onClick={() => atualizar({ orientacoes_mentor: orientacoes })}>Salvar orientações</button>
+        </div>
+
+        {solicitacao.status === 'aceita' && (
+          <button type="button" className="btn-approve" style={{ width: '100%', marginTop: 4 }} onClick={() => atualizar({ status: 'concluida' })}>Marcar mentoria como concluída</button>
+        )}
+
+        <div className="input-group" style={{ marginTop: 16 }}>
+          {!showAcaoPDI ? (
+            <button type="button" className="btn-ghost" onClick={() => setShowAcaoPDI(true)}>+ Recomendar ação para o PDI</button>
+          ) : (
+            <>
+              <label>Título da ação recomendada</label>
+              <div className="form-row">
+                <input value={tituloAcao} onChange={e => setTituloAcao(e.target.value)} placeholder="Ex: Praticar planilhas de indicadores" />
+                <button type="button" className="btn-primary" disabled={!tituloAcao.trim() || salvando} onClick={recomendarAcaoPDI}>Adicionar ao PDI</button>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="btn-ghost" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
