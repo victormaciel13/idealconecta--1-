@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { Target, TrendingUp, Users, MessageSquare, Plus } from 'lucide-react'
+import { Target, TrendingUp, Users, MessageSquare, Plus, X, Search, Wrench, Heart } from 'lucide-react'
 
 export function AdminPDI() {
   const [stats, setStats] = useState({ pdisAtivos: 0, pctMedio: 0, acoesAtraso: 0, feedbacks: 0, mentoriasPendentes: 0 })
-  const [cargos, setCargos] = useState<any[]>([])
-  const [competencias, setCompetencias] = useState<any[]>([])
-  const [showModal, setShowModal] = useState(false)
+  const [colaboradores, setColaboradores] = useState<any[]>([])
+  const [busca, setBusca] = useState('')
+  const [selecionado, setSelecionado] = useState<any>(null)
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -14,17 +14,19 @@ export function AdminPDI() {
     const { count: feedbacksCount } = await supabase.from('feedbacks').select('id', { count: 'exact', head: true })
     const { count: mentoriasCount } = await supabase.from('mentoria_solicitacoes').select('id', { count: 'exact', head: true }).eq('status', 'pendente')
     const { data: acoes } = await supabase.from('pdi_acoes').select('prazo, status')
-    const { data: cargosData } = await supabase.from('cargos').select('*').order('titulo')
-    const { data: compData } = await supabase.from('competencias').select('*, cargo:cargos(titulo)').order('created_at', { ascending: false })
+    const { data: colabsData } = await supabase.from('colaboradores').select('*').eq('ativo', true).order('nome')
 
     const ativos = (pdis || []).filter(p => p.status !== 'concluido')
     const pctMedio = pdis && pdis.length > 0 ? Math.round(pdis.reduce((s, p) => s + p.percentual_conclusao, 0) / pdis.length) : 0
     const atraso = (acoes || []).filter(a => a.prazo && new Date(a.prazo) < new Date() && a.status !== 'concluido').length
 
     setStats({ pdisAtivos: ativos.length, pctMedio, acoesAtraso: atraso, feedbacks: feedbacksCount ?? 0, mentoriasPendentes: mentoriasCount ?? 0 })
-    setCargos(cargosData || [])
-    setCompetencias(compData || [])
+    setColaboradores(colabsData || [])
   }
+
+  const filtrados = colaboradores.filter(c =>
+    `${c.nome} ${c.sobrenome}`.toLowerCase().includes(busca.toLowerCase()) || (c.cargo || '').toLowerCase().includes(busca.toLowerCase())
+  )
 
   return (
     <div className="admin-page">
@@ -41,71 +43,103 @@ export function AdminPDI() {
 
       <section className="section-card" style={{ marginTop: 20 }}>
         <div className="section-head">
-          <h2>Competências cadastradas por cargo</h2>
-          <button className="link-btn" onClick={() => setShowModal(true)}><Plus size={14} /> Nova competência</button>
+          <h2>Hard & Soft Skills por colaborador</h2>
         </div>
-        {competencias.length === 0 ? (
-          <p className="empty">Nenhuma competência cadastrada. Cadastre as competências técnicas e comportamentais de cada cargo pra habilitar o comparativo de nível no PDI dos colaboradores.</p>
-        ) : (
-          <table className="data-table"><thead><tr><th>Competência</th><th>Cargo</th><th>Tipo</th><th>Nível esperado</th></tr></thead>
-            <tbody>{competencias.map(c => (
-              <tr key={c.id}>
-                <td>{c.nome}</td><td>{c.cargo?.titulo || '—'}</td>
-                <td style={{ textTransform: 'capitalize' }}>{c.tipo}</td><td>{c.nivel_esperado}/5</td>
-              </tr>
-            ))}</tbody></table>
-        )}
+        <p className="text-muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>Escolha um colaborador pra atribuir as competências dele. Sem nota — só a lista do que a pessoa tem.</p>
+
+        <div className="input-icon search-bar" style={{ marginBottom: 16, maxWidth: 420 }}>
+          <Search size={18} /><input placeholder="Buscar colaborador..." value={busca} onChange={e => setBusca(e.target.value)} />
+        </div>
+
+        <div className="colab-skill-list">
+          {filtrados.map(c => (
+            <button key={c.id} className="colab-skill-row" onClick={() => setSelecionado(c)}>
+              <div className="colab-mini-avatar">{c.nome?.[0]}{c.sobrenome?.[0]}</div>
+              <div><b>{c.nome} {c.sobrenome}</b><small>{c.cargo || 'Cargo não definido'}</small></div>
+            </button>
+          ))}
+        </div>
       </section>
 
-      {showModal && <NovaCompetenciaModal cargos={cargos} onClose={() => setShowModal(false)} onCreated={load} />}
+      {selecionado && <SkillsColaboradorModal colaborador={selecionado} onClose={() => setSelecionado(null)} />}
     </div>
   )
 }
 
-function NovaCompetenciaModal({ cargos, onClose, onCreated }: { cargos: any[]; onClose: () => void; onCreated: () => void }) {
-  const [nome, setNome] = useState(''); const [cargoId, setCargoId] = useState('')
-  const [tipo, setTipo] = useState('tecnica'); const [nivelEsperado, setNivelEsperado] = useState('3')
-  const [salvando, setSalvando] = useState(false)
+function SkillsColaboradorModal({ colaborador, onClose }: { colaborador: any; onClose: () => void }) {
+  const [skills, setSkills] = useState<any[]>([])
+  const [novaHard, setNovaHard] = useState('')
+  const [novaSoft, setNovaSoft] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  const salvar = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSalvando(true)
-    await supabase.from('competencias').insert({
-      nome, cargo_id: cargoId || null, tipo, nivel_esperado: parseInt(nivelEsperado),
-    })
-    setSalvando(false)
-    onCreated(); onClose()
+  useEffect(() => { load() }, [])
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase.from('colaborador_skills').select('*').eq('colaborador_id', colaborador.id).order('created_at')
+    setSkills(data || [])
+    setLoading(false)
   }
+
+  const adicionar = async (nome: string, tipo: 'tecnica' | 'comportamental') => {
+    if (!nome.trim()) return
+    await supabase.from('colaborador_skills').insert({ colaborador_id: colaborador.id, nome: nome.trim(), tipo })
+    if (tipo === 'tecnica') setNovaHard(''); else setNovaSoft('')
+    load()
+  }
+
+  const remover = async (id: string) => {
+    await supabase.from('colaborador_skills').delete().eq('id', id)
+    load()
+  }
+
+  const hard = skills.filter(s => s.tipo === 'tecnica')
+  const soft = skills.filter(s => s.tipo === 'comportamental')
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content section-card" onClick={e => e.stopPropagation()}>
-        <h3>Nova competência</h3>
-        <form onSubmit={salvar}>
-          <div className="input-group"><label>Nome da competência</label><input value={nome} onChange={e => setNome(e.target.value)} required placeholder="Ex: Gestão de indicadores" /></div>
-          <div className="input-group"><label>Cargo vinculado</label>
-            <select value={cargoId} onChange={e => setCargoId(e.target.value)}>
-              <option value="">Geral (todos os cargos)</option>
-              {cargos.map(c => <option key={c.id} value={c.id}>{c.titulo}</option>)}
-            </select>
-          </div>
-          <div className="form-row">
-            <div className="input-group"><label>Tipo</label>
-              <select value={tipo} onChange={e => setTipo(e.target.value)}>
-                <option value="tecnica">Técnica</option><option value="comportamental">Comportamental</option>
-              </select></div>
-            <div className="input-group"><label>Nível esperado (1-5)</label>
-              <select value={nivelEsperado} onChange={e => setNivelEsperado(e.target.value)}>
-                <option value="1">1 — Necessita desenvolvimento</option><option value="2">2 — Básico</option>
-                <option value="3">3 — Atende ao esperado</option><option value="4">4 — Acima do esperado</option>
-                <option value="5">5 — Referência</option>
-              </select></div>
-          </div>
-          <div className="modal-actions">
-            <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button>
-          </div>
-        </form>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+        <h3>{colaborador.nome} {colaborador.sobrenome}</h3>
+        <p className="text-muted" style={{ fontSize: 13, marginTop: -4, marginBottom: 16 }}>{colaborador.cargo || 'Cargo não definido'}</p>
+
+        {loading ? <p className="empty">Carregando...</p> : (
+          <>
+            <div className="skill-editor-block">
+              <label><Wrench size={14} /> Hard Skills</label>
+              <div className="skill-tag-list" style={{ marginBottom: 10 }}>
+                {hard.length === 0 && <span className="text-muted" style={{ fontSize: 12.5 }}>Nenhuma ainda.</span>}
+                {hard.map(s => (
+                  <span key={s.id} className="skill-tag tecnica removable">
+                    {s.nome} <button onClick={() => remover(s.id)}><X size={11} /></button>
+                  </span>
+                ))}
+              </div>
+              <div className="skill-add-row">
+                <input value={novaHard} onChange={e => setNovaHard(e.target.value)} placeholder="Ex: Excel avançado" onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), adicionar(novaHard, 'tecnica'))} />
+                <button type="button" className="btn-ghost" onClick={() => adicionar(novaHard, 'tecnica')}><Plus size={14} /></button>
+              </div>
+            </div>
+
+            <div className="skill-editor-block" style={{ marginTop: 18 }}>
+              <label><Heart size={14} /> Soft Skills</label>
+              <div className="skill-tag-list" style={{ marginBottom: 10 }}>
+                {soft.length === 0 && <span className="text-muted" style={{ fontSize: 12.5 }}>Nenhuma ainda.</span>}
+                {soft.map(s => (
+                  <span key={s.id} className="skill-tag comportamental removable">
+                    {s.nome} <button onClick={() => remover(s.id)}><X size={11} /></button>
+                  </span>
+                ))}
+              </div>
+              <div className="skill-add-row">
+                <input value={novaSoft} onChange={e => setNovaSoft(e.target.value)} placeholder="Ex: Comunicação" onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), adicionar(novaSoft, 'comportamental'))} />
+                <button type="button" className="btn-ghost" onClick={() => adicionar(novaSoft, 'comportamental')}><Plus size={14} /></button>
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="modal-actions" style={{ marginTop: 20 }}>
+          <button type="button" className="btn-primary" onClick={onClose}>Concluído</button>
+        </div>
       </div>
     </div>
   )
