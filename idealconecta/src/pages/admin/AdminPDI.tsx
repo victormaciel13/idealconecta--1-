@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
   Target, TrendingUp, Users, MessageSquare, Check, Search, Wrench, Heart, Calendar,
-  BookOpen, Plus, Trash2, Filter
+  BookOpen, Plus, Trash2, Filter, Star, Building2, X, GripVertical
 } from 'lucide-react'
 
 const HARD_SKILLS_PADRAO = [
@@ -15,6 +15,12 @@ const SOFT_SKILLS_PADRAO = [
   'Comunicação', 'Resiliência', 'Trabalho em equipe', 'Organização', 'Proatividade',
   'Senso de urgência', 'Adaptabilidade', 'Ética e confidencialidade', 'Orientação a resultados',
   'Inteligência emocional', 'Atenção a detalhes', 'Gestão do tempo',
+]
+const AREA_SKILLS_PADRAO = [
+  'Recrutamento e seleção', 'Administração de pessoal', 'Fechamento de folha de pagamento',
+  'Gestão de benefícios', 'Prospecção comercial', 'Negociação com clientes',
+  'Legislação trabalhista aplicada', 'Gestão de indicadores da área',
+  'Atendimento a clientes internos/externos', 'Processos operacionais e logística',
 ]
 
 type Tab = 'painel' | 'competencias' | 'mentorias' | 'feedbacks' | 'trilhas'
@@ -117,6 +123,229 @@ function PainelTab({ equipe }: { equipe: any[] }) {
 }
 
 function CompetenciasTab({ equipe, isSoGestor }: { equipe: any[]; isSoGestor: boolean }) {
+  const [subTab, setSubTab] = useState<'top3' | 'metas' | 'porcolab'>('top3')
+
+  return (
+    <>
+      <div className="pdi-subtabs">
+        <button className={subTab === 'top3' ? 'active' : ''} onClick={() => setSubTab('top3')}><Star size={13} /> Top 3 por categoria</button>
+        <button className={subTab === 'metas' ? 'active' : ''} onClick={() => setSubTab('metas')}><Target size={13} /> Competências a atingir</button>
+        <button className={subTab === 'porcolab' ? 'active' : ''} onClick={() => setSubTab('porcolab')}><Users size={13} /> Todas, por colaborador</button>
+      </div>
+      {subTab === 'top3' && <Top3Board equipe={equipe} />}
+      {subTab === 'metas' && <MetaCompetenciaBoard equipe={equipe} />}
+      {subTab === 'porcolab' && <PorColaboradorBoard equipe={equipe} isSoGestor={isSoGestor} />}
+    </>
+  )
+}
+
+// Quadro 1 — as 3 principais competências ATUAIS de cada colaborador, em
+// cada uma das 3 categorias (Soft, Hard, Área). Clica no "+" de cada
+// categoria pra escolher, até 3 por categoria.
+function Top3Board({ equipe }: { equipe: any[] }) {
+  const [skills, setSkills] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [picker, setPicker] = useState<{ colaborador: any; tipo: 'tecnica' | 'comportamental' | 'area' } | null>(null)
+
+  useEffect(() => { load() }, [equipe.length])
+  async function load() {
+    setLoading(true)
+    const ids = equipe.map(c => c.id)
+    if (ids.length === 0) { setSkills([]); setLoading(false); return }
+    const { data } = await supabase.from('colaborador_skills').select('*').in('colaborador_id', ids)
+    setSkills(data || [])
+    setLoading(false)
+  }
+
+  const doColab = (colaboradorId: string, tipo: string) => skills.filter(s => s.colaborador_id === colaboradorId && s.tipo === tipo)
+
+  const remover = async (id: string) => {
+    await supabase.from('colaborador_skills').delete().eq('id', id)
+    load()
+  }
+
+  if (loading) return <p className="empty">Carregando...</p>
+  if (equipe.length === 0) return <section className="section-card"><p className="empty">Nenhum colaborador na sua equipe ainda.</p></section>
+
+  return (
+    <section className="section-card" style={{ overflowX: 'auto' }}>
+      <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>Marque até 3 competências principais de cada categoria pra cada pessoa do time.</p>
+      <table className="top3-table">
+        <thead>
+          <tr>
+            <th>Colaborador</th>
+            <th><Wrench size={13} /> Hard Skills</th>
+            <th><Heart size={13} /> Soft Skills</th>
+            <th><Building2 size={13} /> Competência de área</th>
+          </tr>
+        </thead>
+        <tbody>
+          {equipe.map(c => (
+            <tr key={c.id}>
+              <td className="top3-nome">{c.nome} {c.sobrenome}</td>
+              {(['tecnica', 'comportamental', 'area'] as const).map(tipo => (
+                <td key={tipo}>
+                  <div className="top3-chips">
+                    {doColab(c.id, tipo).map(s => (
+                      <span key={s.id} className={`skill-tag ${tipo === 'comportamental' ? 'comportamental' : tipo === 'area' ? 'area' : 'tecnica'} removable`}>
+                        {s.nome} <button onClick={() => remover(s.id)}><X size={11} /></button>
+                      </span>
+                    ))}
+                    {doColab(c.id, tipo).length < 3 && (
+                      <button className="top3-add" onClick={() => setPicker({ colaborador: c, tipo })}><Plus size={12} /></button>
+                    )}
+                  </div>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {picker && (
+        <PickerModal
+          colaborador={picker.colaborador} tipo={picker.tipo}
+          jaSelecionadas={doColab(picker.colaborador.id, picker.tipo).map(s => s.nome)}
+          onClose={() => { setPicker(null); load() }}
+        />
+      )}
+    </section>
+  )
+}
+
+function catalogoPorTipo(tipo: 'tecnica' | 'comportamental' | 'area') {
+  if (tipo === 'tecnica') return HARD_SKILLS_PADRAO
+  if (tipo === 'comportamental') return SOFT_SKILLS_PADRAO
+  return AREA_SKILLS_PADRAO
+}
+
+function PickerModal({ colaborador, tipo, jaSelecionadas, onClose }: { colaborador: any; tipo: 'tecnica' | 'comportamental' | 'area'; jaSelecionadas: string[]; onClose: () => void }) {
+  const catalogo = catalogoPorTipo(tipo).filter(nome => !jaSelecionadas.includes(nome))
+
+  const escolher = async (nome: string) => {
+    await supabase.from('colaborador_skills').insert({ colaborador_id: colaborador.id, nome, tipo })
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+        <h3>{colaborador.nome} {colaborador.sobrenome}</h3>
+        <p className="text-muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>Escolha uma competência ({jaSelecionadas.length}/3 já escolhidas)</p>
+        <div className="skill-toggle-grid">
+          {catalogo.length === 0 ? <p className="empty">Todas as opções já foram usadas.</p> : catalogo.map(nome => (
+            <button key={nome} type="button" className="skill-toggle" onClick={() => escolher(nome)}>{nome}</button>
+          ))}
+        </div>
+        <div className="modal-actions"><button type="button" className="btn-ghost" onClick={onClose}>Fechar</button></div>
+      </div>
+    </div>
+  )
+}
+
+// Quadro 2 — competências a ATINGIR (metas), preenchido arrastando a
+// competência da paleta pro quadrado do colaborador/categoria certo.
+function MetaCompetenciaBoard({ equipe }: { equipe: any[] }) {
+  const [metas, setMetas] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [arrastando, setArrastando] = useState<{ nome: string; tipo: string } | null>(null)
+  const [sobre, setSobre] = useState<string | null>(null)
+
+  useEffect(() => { load() }, [equipe.length])
+  async function load() {
+    setLoading(true)
+    const ids = equipe.map(c => c.id)
+    if (ids.length === 0) { setMetas([]); setLoading(false); return }
+    const { data } = await supabase.from('colaborador_metas_competencia').select('*').in('colaborador_id', ids)
+    setMetas(data || [])
+    setLoading(false)
+  }
+
+  const metaDe = (colaboradorId: string, categoria: string) => metas.find(m => m.colaborador_id === colaboradorId && m.categoria === categoria)
+
+  const soltar = async (colaboradorId: string, categoria: string) => {
+    if (!arrastando) return
+    await supabase.from('colaborador_metas_competencia')
+      .upsert({ colaborador_id: colaboradorId, categoria, competencia_nome: arrastando.nome }, { onConflict: 'colaborador_id,categoria' })
+    setArrastando(null); setSobre(null)
+    load()
+  }
+
+  const limpar = async (id: string) => {
+    await supabase.from('colaborador_metas_competencia').delete().eq('id', id)
+    load()
+  }
+
+  if (loading) return <p className="empty">Carregando...</p>
+  if (equipe.length === 0) return <section className="section-card"><p className="empty">Nenhum colaborador na sua equipe ainda.</p></section>
+
+  return (
+    <section className="section-card">
+      <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>Arraste uma competência da lista abaixo pro quadrado do colaborador — isso vira a meta a atingir dele naquela categoria.</p>
+
+      <div className="meta-palette">
+        {(['tecnica', 'comportamental', 'area'] as const).map(tipo => (
+          <div key={tipo} className="meta-palette-col">
+            <b className="meta-palette-title">
+              {tipo === 'tecnica' && <><Wrench size={12} /> Hard Skills</>}
+              {tipo === 'comportamental' && <><Heart size={12} /> Soft Skills</>}
+              {tipo === 'area' && <><Building2 size={12} /> Área</>}
+            </b>
+            {catalogoPorTipo(tipo).map(nome => (
+              <div
+                key={nome} draggable
+                className="meta-chip"
+                onDragStart={() => setArrastando({ nome, tipo })}
+                onDragEnd={() => setArrastando(null)}
+              >
+                <GripVertical size={12} /> {nome}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      <div className="meta-grid" style={{ overflowX: 'auto' }}>
+        <table className="top3-table">
+          <thead>
+            <tr><th>Colaborador</th><th>Hard Skill</th><th>Soft Skill</th><th>Área</th></tr>
+          </thead>
+          <tbody>
+            {equipe.map(c => (
+              <tr key={c.id}>
+                <td className="top3-nome">{c.nome} {c.sobrenome}</td>
+                {(['tecnica', 'comportamental', 'area'] as const).map(categoria => {
+                  const meta = metaDe(c.id, categoria)
+                  const cellKey = `${c.id}-${categoria}`
+                  return (
+                    <td key={categoria}>
+                      <div
+                        className={`meta-dropzone ${sobre === cellKey ? 'over' : ''}`}
+                        onDragOver={e => { e.preventDefault(); setSobre(cellKey) }}
+                        onDragLeave={() => setSobre(null)}
+                        onDrop={e => { e.preventDefault(); soltar(c.id, categoria) }}
+                      >
+                        {meta ? (
+                          <span className={`skill-tag ${categoria === 'comportamental' ? 'comportamental' : categoria === 'area' ? 'area' : 'tecnica'} removable`}>
+                            {meta.competencia_nome} <button onClick={() => limpar(meta.id)}><X size={11} /></button>
+                          </span>
+                        ) : (
+                          <span className="meta-placeholder">Solte aqui</span>
+                        )}
+                      </div>
+                    </td>
+                  )
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function PorColaboradorBoard({ equipe, isSoGestor }: { equipe: any[]; isSoGestor: boolean }) {
   const [skillCounts, setSkillCounts] = useState<Record<string, number>>({})
   const [busca, setBusca] = useState('')
   const [filtroDepto, setFiltroDepto] = useState('')
@@ -197,7 +426,7 @@ function SkillsColaboradorModal({ colaborador, onClose }: { colaborador: any; on
   const isMarcado = (nome: string, tipo: string) => skills.some(s => s.nome === nome && s.tipo === tipo)
   const idDaSkill = (nome: string, tipo: string) => skills.find(s => s.nome === nome && s.tipo === tipo)?.id
 
-  const toggle = async (nome: string, tipo: 'tecnica' | 'comportamental') => {
+  const toggle = async (nome: string, tipo: 'tecnica' | 'comportamental' | 'area') => {
     if (isMarcado(nome, tipo)) {
       const id = idDaSkill(nome, tipo)
       if (id) await supabase.from('colaborador_skills').delete().eq('id', id)
@@ -232,6 +461,17 @@ function SkillsColaboradorModal({ colaborador, onClose }: { colaborador: any; on
                 {SOFT_SKILLS_PADRAO.map(nome => (
                   <button key={nome} type="button" className={`skill-toggle soft ${isMarcado(nome, 'comportamental') ? 'checked' : ''}`} onClick={() => toggle(nome, 'comportamental')}>
                     {isMarcado(nome, 'comportamental') && <Check size={13} />} {nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="skill-editor-block" style={{ marginTop: 20 }}>
+              <label><Building2 size={14} /> Competências de área</label>
+              <div className="skill-toggle-grid">
+                {AREA_SKILLS_PADRAO.map(nome => (
+                  <button key={nome} type="button" className={`skill-toggle area ${isMarcado(nome, 'area') ? 'checked' : ''}`} onClick={() => toggle(nome, 'area')}>
+                    {isMarcado(nome, 'area') && <Check size={13} />} {nome}
                   </button>
                 ))}
               </div>
