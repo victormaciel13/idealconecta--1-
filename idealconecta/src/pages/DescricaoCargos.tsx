@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { gerarCargoPDF } from '../lib/pdfGenerator'
-import { Search, Briefcase, Plus, FileText } from 'lucide-react'
+import { Search, Briefcase, Plus, FileText, Upload } from 'lucide-react'
 
 export function DescricaoCargos() {
   const { profile } = useAuth()
@@ -11,6 +11,7 @@ export function DescricaoCargos() {
   const [busca, setBusca] = useState('')
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editando, setEditando] = useState<any>(null)
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -25,10 +26,9 @@ export function DescricaoCargos() {
   )
   const deptos = [...new Set(filtrados.map(c => c.departamento || 'Outros'))]
 
-  // Se já existir um PDF de verdade anexado (upload manual), abre ele.
-  // Senão, monta o PDF na hora com a Missão, Responsabilidades e as
-  // competências (Hard/Soft Skills) que estão vinculadas a esse cargo —
-  // as mesmas que aparecem no PDI do colaborador.
+  // Se já existir um PDF de verdade anexado (o design oficial da empresa),
+  // abre ele. Senão, monta um PDF na hora a partir do texto cadastrado,
+  // como alternativa enquanto o PDF oficial não foi anexado.
   const abrirPDF = async (c: any) => {
     if (c.arquivo_url) { window.open(c.arquivo_url, '_blank'); return }
 
@@ -64,17 +64,25 @@ export function DescricaoCargos() {
           <p className="eyebrow" style={{ marginTop: 24 }}>{depto}</p>
           <div className="cargo-icon-grid">
             {filtrados.filter(c => (c.departamento || 'Outros') === depto).map(c => (
-              <button key={c.id} className="cargo-icon-card" onClick={() => abrirPDF(c)}>
-                <div className="cargo-icon-badge"><Briefcase size={22} /></div>
-                <b>{c.titulo}</b>
-                <span className="cargo-icon-hint"><FileText size={12} /> Abrir PDF</span>
-              </button>
+              <div key={c.id} className="cargo-icon-card-wrap">
+                <button className="cargo-icon-card" onClick={() => abrirPDF(c)}>
+                  <div className="cargo-icon-badge"><Briefcase size={22} /></div>
+                  <b>{c.titulo}</b>
+                  <span className="cargo-icon-hint"><FileText size={12} /> {c.arquivo_url ? 'Abrir PDF' : 'Ver descrição'}</span>
+                </button>
+                {isAdmin && (
+                  <button className="cargo-upload-badge" title={c.arquivo_url ? 'Trocar PDF' : 'Subir PDF do cargo'} onClick={() => setEditando(c)}>
+                    <Upload size={13} /> {c.arquivo_url ? 'Trocar PDF' : 'Subir PDF'}
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
       ))}
 
       {showModal && <NovoCargoModal onClose={() => setShowModal(false)} onCreated={load} />}
+      {editando && <EditarCargoModal cargo={editando} onClose={() => setEditando(null)} onSaved={load} />}
     </div>
   )
 }
@@ -84,6 +92,7 @@ function NovoCargoModal({ onClose, onCreated }: { onClose: () => void; onCreated
   const [missao, setMissao] = useState(''); const [responsabilidades, setResponsabilidades] = useState('')
   const [hardSkills, setHardSkills] = useState(''); const [softSkills, setSoftSkills] = useState('')
   const [indicadores, setIndicadores] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [enviando, setEnviando] = useState(false); const [erro, setErro] = useState('')
 
   const salvar = async (e: React.FormEvent) => {
@@ -91,14 +100,21 @@ function NovoCargoModal({ onClose, onCreated }: { onClose: () => void; onCreated
     if (!titulo || !departamento || !missao) return
     setEnviando(true); setErro('')
 
+    let arquivo_url: string | null = null
+    if (file) {
+      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error: uploadError } = await supabase.storage.from('cargos').upload(path, file)
+      if (uploadError) { setErro('Erro no upload do PDF. Verifique se o bucket "cargos" foi criado (migration_006).'); setEnviando(false); return }
+      const { data: pub } = supabase.storage.from('cargos').getPublicUrl(path)
+      arquivo_url = pub.publicUrl
+    }
+
     const { data: cargo, error } = await supabase.from('cargos').insert({
-      titulo, departamento, descricao: missao, responsabilidades: responsabilidades || null, indicadores: indicadores || null,
+      titulo, departamento, descricao: missao, responsabilidades: responsabilidades || null, indicadores: indicadores || null, arquivo_url,
     }).select().single()
 
     if (error || !cargo) { setErro('Não foi possível salvar o cargo.'); setEnviando(false); return }
 
-    // Cada linha digitada em Hard/Soft Skills vira uma competência vinculada
-    // a esse cargo — é isso que alimenta o comparativo no PDI do colaborador.
     const competenciasParaInserir = [
       ...hardSkills.split('\n').filter(l => l.trim()).map(nome => ({ cargo_id: cargo.id, nome: nome.trim(), tipo: 'tecnica', nivel_esperado: 3 })),
       ...softSkills.split('\n').filter(l => l.trim()).map(nome => ({ cargo_id: cargo.id, nome: nome.trim(), tipo: 'comportamental', nivel_esperado: 3 })),
@@ -120,6 +136,15 @@ function NovoCargoModal({ onClose, onCreated }: { onClose: () => void; onCreated
             <div className="input-group"><label>Título do cargo</label><input value={titulo} onChange={e => setTitulo(e.target.value)} required placeholder="Ex: Analista Comercial JR" /></div>
             <div className="input-group"><label>Departamento</label><input value={departamento} onChange={e => setDepartamento(e.target.value)} required placeholder="Ex: Comercial" /></div>
           </div>
+          <div className="input-group">
+            <label>PDF oficial do cargo (opcional — com o design da empresa)</label>
+            <label className="file-drop">
+              <Upload size={18} />
+              <span>{file ? file.name : 'Clique para anexar o PDF já pronto'}</span>
+              <input type="file" accept="application/pdf" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+            </label>
+            <small className="text-muted" style={{ fontSize: 12 }}>Se anexar aqui, o colaborador vê exatamente esse arquivo. Os campos abaixo continuam servindo pra alimentar o PDI, mesmo com o PDF anexado.</small>
+          </div>
           <div className="input-group"><label>Missão</label><textarea value={missao} onChange={e => setMissao(e.target.value)} rows={3} required /></div>
           <div className="input-group"><label>Responsabilidades (uma por linha)</label><textarea value={responsabilidades} onChange={e => setResponsabilidades(e.target.value)} rows={4} /></div>
           <div className="form-row">
@@ -132,6 +157,59 @@ function NovoCargoModal({ onClose, onCreated }: { onClose: () => void; onCreated
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
             <button type="submit" className="btn-primary" disabled={enviando}>{enviando ? 'Salvando...' : 'Salvar cargo'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function EditarCargoModal({ cargo, onClose, onSaved }: { cargo: any; onClose: () => void; onSaved: () => void }) {
+  const [titulo, setTitulo] = useState(cargo.titulo)
+  const [departamento, setDepartamento] = useState(cargo.departamento || '')
+  const [file, setFile] = useState<File | null>(null)
+  const [salvando, setSalvando] = useState(false); const [erro, setErro] = useState('')
+
+  const salvar = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSalvando(true); setErro('')
+
+    let arquivo_url = cargo.arquivo_url
+    if (file) {
+      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error: uploadError } = await supabase.storage.from('cargos').upload(path, file)
+      if (uploadError) { setErro('Erro no upload do PDF.'); setSalvando(false); return }
+      const { data: pub } = supabase.storage.from('cargos').getPublicUrl(path)
+      arquivo_url = pub.publicUrl
+    }
+
+    const { error } = await supabase.from('cargos').update({ titulo, departamento, arquivo_url }).eq('id', cargo.id)
+    setSalvando(false)
+    if (error) { setErro('Não foi possível salvar.'); return }
+    onSaved(); onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()}>
+        <h3>Editar {cargo.titulo}</h3>
+        <form onSubmit={salvar}>
+          <div className="form-row">
+            <div className="input-group"><label>Título</label><input value={titulo} onChange={e => setTitulo(e.target.value)} required /></div>
+            <div className="input-group"><label>Departamento</label><input value={departamento} onChange={e => setDepartamento(e.target.value)} required /></div>
+          </div>
+          <div className="input-group">
+            <label>{cargo.arquivo_url ? 'Substituir PDF oficial' : 'Anexar PDF oficial (design da empresa)'}</label>
+            <label className="file-drop">
+              <Upload size={18} />
+              <span>{file ? file.name : cargo.arquivo_url ? 'Já tem um PDF anexado — clique pra trocar' : 'Clique para anexar o PDF'}</span>
+              <input type="file" accept="application/pdf" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+            </label>
+          </div>
+          {erro && <p className="form-error">{erro}</p>}
+          <div className="modal-actions">
+            <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn-primary" disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button>
           </div>
         </form>
       </div>

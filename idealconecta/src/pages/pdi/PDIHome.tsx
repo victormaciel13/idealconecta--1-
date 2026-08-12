@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
 import {
   Target, Users, MessageSquare, Award, TrendingUp, Calendar,
-  ThumbsUp, Send, Plus, X, ChevronRight
+  ThumbsUp, Send, Plus, X, ChevronRight, Wrench, Heart
 } from 'lucide-react'
 
 const statusLabel: Record<string, string> = {
@@ -31,7 +31,6 @@ export function PDIHome() {
     let { data: pdiData } = await supabase.from('pdis').select('*').eq('colaborador_id', profile!.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
 
     if (!pdiData) {
-      // Cria automaticamente um PDI vazio no primeiro acesso do colaborador
       const { data: created } = await supabase.from('pdis').insert({
         colaborador_id: profile!.id, status: 'nao_iniciado', percentual_conclusao: 0,
       }).select().single()
@@ -187,80 +186,49 @@ function NovaAcaoModal({ pdiId, onClose, onCreated }: { pdiId: string; onClose: 
   )
 }
 
+// Lista simples de Hard Skills e Soft Skills atribuídas pelo admin a esse
+// colaborador especificamente — sem nota, sem comparação, só a lista.
 function CompetenciasTab({ profile }: any) {
-  const [competencias, setCompetencias] = useState<any[]>([])
-  const [niveis, setNiveis] = useState<any[]>([])
+  const [skills, setSkills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [cargoEncontrado, setCargoEncontrado] = useState(true)
 
   useEffect(() => { load() }, [profile])
   async function load() {
     setLoading(true)
-
-    // Busca as competências vinculadas especificamente ao cargo do
-    // colaborador (casando pelo nome do cargo cadastrado no perfil dele
-    // com o título cadastrado em Descrição de Cargos).
-    let comp: any[] = []
-    if (profile.cargo) {
-      const { data: cargoRow } = await supabase.from('cargos').select('id').ilike('titulo', profile.cargo).maybeSingle()
-      if (cargoRow) {
-        const { data } = await supabase.from('competencias').select('*').eq('cargo_id', cargoRow.id).order('tipo')
-        comp = data || []
-        setCargoEncontrado(true)
-      } else {
-        setCargoEncontrado(false)
-      }
-    } else {
-      setCargoEncontrado(false)
-    }
-
-    const { data: niv } = await supabase.from('colaborador_competencias').select('*').eq('colaborador_id', profile.id)
-    setCompetencias(comp)
-    setNiveis(niv || [])
+    const { data } = await supabase.from('colaborador_skills').select('*').eq('colaborador_id', profile.id).order('created_at')
+    setSkills(data || [])
     setLoading(false)
   }
 
-  const nivelAtual = (compId: string) => niveis.find(n => n.competencia_id === compId)?.nivel_atual || 1
-
   if (loading) return <p className="empty">Carregando...</p>
-  if (!cargoEncontrado) return (
+
+  const hard = skills.filter(s => s.tipo === 'tecnica')
+  const soft = skills.filter(s => s.tipo === 'comportamental')
+
+  if (skills.length === 0) return (
     <section className="section-card">
-      <p className="empty">Seu cargo ("{profile.cargo || 'não definido'}") ainda não tem competências cadastradas em Descrição de Cargos. Peça ao RH pra vincular as Hard/Soft Skills desse cargo.</p>
+      <p className="empty">Suas Hard e Soft Skills ainda não foram cadastradas. Isso é feito pelo seu gestor ou pelo RH.</p>
     </section>
   )
-  if (competencias.length === 0) return (
-    <section className="section-card">
-      <p className="empty">Nenhuma competência cadastrada ainda. O RH pode cadastrar as competências de cada cargo na tela de administração.</p>
-    </section>
-  )
-
-  const tecnicas = competencias.filter(c => c.tipo === 'tecnica')
-  const comportamentais = competencias.filter(c => c.tipo === 'comportamental')
-
-  const Barra = ({ c }: { c: any }) => {
-    const atual = nivelAtual(c.id)
-    return (
-      <div className="comp-row">
-        <div className="comp-row-head"><b>{c.nome}</b><span>{atual}/5 · esperado {c.nivel_esperado}/5</span></div>
-        <div className="comp-bar-track">
-          <div className="comp-bar-esperado" style={{ width: `${(c.nivel_esperado / 5) * 100}%` }} />
-          <div className="comp-bar-atual" style={{ width: `${(atual / 5) * 100}%` }} />
-        </div>
-      </div>
-    )
-  }
 
   return (
     <>
       <section className="section-card">
-        <h2>Competências técnicas</h2>
-        {tecnicas.length === 0 ? <p className="empty">Nenhuma cadastrada.</p> : tecnicas.map(c => <Barra key={c.id} c={c} />)}
+        <div className="section-head"><h2><Wrench size={16} /> Hard Skills</h2></div>
+        {hard.length === 0 ? <p className="empty">Nenhuma cadastrada ainda.</p> : (
+          <div className="skill-tag-list">
+            {hard.map(s => <span key={s.id} className="skill-tag tecnica">{s.nome}</span>)}
+          </div>
+        )}
       </section>
       <section className="section-card" style={{ marginTop: 16 }}>
-        <h2>Competências comportamentais</h2>
-        {comportamentais.length === 0 ? <p className="empty">Nenhuma cadastrada.</p> : comportamentais.map(c => <Barra key={c.id} c={c} />)}
+        <div className="section-head"><h2><Heart size={16} /> Soft Skills</h2></div>
+        {soft.length === 0 ? <p className="empty">Nenhuma cadastrada ainda.</p> : (
+          <div className="skill-tag-list">
+            {soft.map(s => <span key={s.id} className="skill-tag comportamental">{s.nome}</span>)}
+          </div>
+        )}
       </section>
-      <p className="text-muted" style={{ fontSize: 12.5, marginTop: 10 }}>A barra clara mostra o nível esperado para o cargo; a roxa mostra seu nível atual, avaliado pelo gestor.</p>
     </>
   )
 }
@@ -352,7 +320,6 @@ function FeedbackModal({ mode, profile, colaboradores, onClose, onCreated }: any
         contexto, comportamento, impacto, sugestao, pontos_positivos: pontosPositivos, confidencial,
       })
     } else {
-      // Solicitação: registra como feedback pendente onde o destinatário é quem vai preencher
       await supabase.from('feedbacks').insert({
         autor_id: profile.id, destinatario_id: destinatarioId, relacao, categoria: 'acompanhamento',
         contexto: `Solicitação de feedback: ${contexto}`, status: 'pendente',
@@ -408,6 +375,7 @@ function MentoriasTab({ profile }: any) {
   const [mentores, setMentores] = useState<any[]>([])
   const [minhas, setMinhas] = useState<any[]>([])
   const [mentorSelecionado, setMentorSelecionado] = useState<any>(null)
+  const [detalhando, setDetalhando] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => { load() }, [profile])
@@ -421,7 +389,7 @@ function MentoriasTab({ profile }: any) {
 
   if (loading) return <p className="empty">Carregando...</p>
 
-  const statusMentoriaLabel: Record<string, string> = { pendente: 'Pendente', aceita: 'Aceita', recusada: 'Recusada', reagendada: 'Reagendada', concluida: 'Concluída' }
+  const statusMentoriaLabel: Record<string, string> = { pendente: 'Pendente', aceita: 'Aceita', recusada: 'Recusada', reagendada: 'Nova data sugerida', aguardando_info: 'Mentor pediu mais informações', concluida: 'Concluída' }
 
   return (
     <>
@@ -444,25 +412,109 @@ function MentoriasTab({ profile }: any) {
       <section className="section-card" style={{ marginTop: 16 }}>
         <h2>Minhas solicitações</h2>
         {minhas.length === 0 ? <p className="empty">Nenhuma mentoria solicitada ainda.</p> : (
-          <table className="data-table"><thead><tr><th>Mentor</th><th>Tema</th><th>Status</th><th>Data</th></tr></thead>
-            <tbody>{minhas.map(s => (
-              <tr key={s.id}><td>{s.mentor?.nome}</td><td>{s.tema}</td>
-                <td><span className="status-badge">{statusMentoriaLabel[s.status]}</span></td>
-                <td>{new Date(s.created_at).toLocaleDateString('pt-BR')}</td></tr>
-            ))}</tbody></table>
+          <div className="approval-list">
+            {minhas.map(s => (
+              <button key={s.id} className="approval-card approval-card-clickable" onClick={() => setDetalhando(s)}>
+                <div className="approval-header">
+                  <strong>{s.mentor?.nome} · {s.tema}</strong>
+                  <span className="status-badge">{statusMentoriaLabel[s.status]}</span>
+                </div>
+                <span className="text-muted" style={{ fontSize: 12 }}>{new Date(s.created_at).toLocaleDateString('pt-BR')}</span>
+                {s.status === 'reagendada' && s.nova_data_sugerida && <p style={{ fontSize: 13, color: 'var(--primary-2)', margin: '6px 0 0' }}>Mentor sugeriu: {new Date(s.nova_data_sugerida).toLocaleDateString('pt-BR')}</p>}
+                {s.status === 'aguardando_info' && s.mensagem_mentor && <p style={{ fontSize: 13, color: 'var(--warn)', margin: '6px 0 0' }}>"{s.mensagem_mentor}"</p>}
+              </button>
+            ))}
+          </div>
         )}
       </section>
 
       {mentorSelecionado && (
         <SolicitarMentoriaModal profile={profile} mentor={mentorSelecionado} onClose={() => setMentorSelecionado(null)} onCreated={load} />
       )}
+      {detalhando && (
+        <DetalheMentoriaModal solicitacao={detalhando} onClose={() => { setDetalhando(null); load() }} />
+      )}
     </>
+  )
+}
+
+function DetalheMentoriaModal({ solicitacao, onClose }: any) {
+  const [aprendizados, setAprendizados] = useState(solicitacao.aprendizados || '')
+  const [compromissos, setCompromissos] = useState(solicitacao.compromissos || '')
+  const [proximasAcoes, setProximasAcoes] = useState(solicitacao.proximas_acoes || '')
+  const [evidencias, setEvidencias] = useState(solicitacao.evidencias_anotacoes || '')
+  const [avaliacao, setAvaliacao] = useState(solicitacao.avaliacao || 0)
+  const [salvando, setSalvando] = useState(false)
+
+  const salvar = async () => {
+    setSalvando(true)
+    await supabase.from('mentoria_solicitacoes').update({
+      aprendizados, compromissos, proximas_acoes: proximasAcoes, evidencias_anotacoes: evidencias,
+      avaliacao: avaliacao || null,
+    }).eq('id', solicitacao.id)
+    setSalvando(false)
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <h3>{solicitacao.tema}</h3>
+        <p className="text-muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 16 }}>com {solicitacao.mentor?.nome}</p>
+
+        {solicitacao.nova_data_sugerida && (
+          <div className="alert-box" style={{ marginBottom: 16 }}>
+            <div><b>Nova data sugerida pelo mentor</b><p>{new Date(solicitacao.nova_data_sugerida).toLocaleDateString('pt-BR')}</p></div>
+          </div>
+        )}
+        {solicitacao.mensagem_mentor && (
+          <div className="alert-box" style={{ marginBottom: 16 }}>
+            <div><b>Mensagem do mentor</b><p>{solicitacao.mensagem_mentor}</p></div>
+          </div>
+        )}
+        {solicitacao.orientacoes_mentor && (
+          <section className="section-card" style={{ marginBottom: 16, background: 'var(--purple-soft)', boxShadow: 'none' }}>
+            <b style={{ fontSize: 13 }}>Orientações do mentor</b>
+            <p style={{ fontSize: 13.5, margin: '6px 0 0' }}>{solicitacao.orientacoes_mentor}</p>
+          </section>
+        )}
+
+        {(solicitacao.status === 'aceita' || solicitacao.status === 'concluida') && (
+          <>
+            <p className="text-muted" style={{ fontSize: 12.5, marginBottom: 12 }}>Depois da mentoria, registre aqui o que você tirou dela:</p>
+            <div className="input-group"><label>Principais aprendizados</label><textarea value={aprendizados} onChange={e => setAprendizados(e.target.value)} rows={2} /></div>
+            <div className="input-group"><label>Compromissos assumidos</label><textarea value={compromissos} onChange={e => setCompromissos(e.target.value)} rows={2} /></div>
+            <div className="input-group"><label>Próximas ações</label><textarea value={proximasAcoes} onChange={e => setProximasAcoes(e.target.value)} rows={2} /></div>
+            <div className="input-group"><label>Evidências ou anotações</label><textarea value={evidencias} onChange={e => setEvidencias(e.target.value)} rows={2} /></div>
+            <div className="input-group">
+              <label>Avaliação da mentoria</label>
+              <div className="star-rating">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button key={n} type="button" className={`star ${n <= avaliacao ? 'filled' : ''}`} onClick={() => setAvaliacao(n)}>★</button>
+                ))}
+              </div>
+            </div>
+            <div className="modal-actions">
+              <button type="button" className="btn-ghost" onClick={onClose}>Fechar</button>
+              <button type="button" className="btn-primary" disabled={salvando} onClick={salvar}>{salvando ? 'Salvando...' : 'Salvar registro'}</button>
+            </div>
+          </>
+        )}
+        {solicitacao.status === 'pendente' && <p className="empty">Aguardando resposta do mentor.</p>}
+        {solicitacao.status === 'recusada' && <p className="empty">Essa solicitação foi recusada.</p>}
+        {solicitacao.status !== 'aceita' && solicitacao.status !== 'concluida' && solicitacao.status !== 'pendente' && solicitacao.status !== 'recusada' && (
+          <div className="modal-actions"><button type="button" className="btn-ghost" onClick={onClose}>Fechar</button></div>
+        )}
+      </div>
+    </div>
   )
 }
 
 function SolicitarMentoriaModal({ profile, mentor, onClose, onCreated }: any) {
   const [tema, setTema] = useState(''); const [objetivo, setObjetivo] = useState('')
-  const [desafio, setDesafio] = useState(''); const [dataPreferida, setDataPreferida] = useState('')
+  const [desafio, setDesafio] = useState(''); const [competencia, setCompetencia] = useState('')
+  const [relacaoPdi, setRelacaoPdi] = useState('')
+  const [dataPreferida, setDataPreferida] = useState('')
   const [horario, setHorario] = useState(''); const [formato, setFormato] = useState('videochamada')
   const [observacoes, setObservacoes] = useState(''); const [salvando, setSalvando] = useState(false)
 
@@ -471,6 +523,7 @@ function SolicitarMentoriaModal({ profile, mentor, onClose, onCreated }: any) {
     setSalvando(true)
     await supabase.from('mentoria_solicitacoes').insert({
       colaborador_id: profile.id, mentor_id: mentor.id, tema, objetivo, desafio_atual: desafio,
+      competencia_relacionada: competencia || null, relacao_pdi: relacaoPdi || null,
       data_preferida: dataPreferida || null, horario_preferido: horario || null, formato, observacoes,
     })
     setSalvando(false)
@@ -485,6 +538,8 @@ function SolicitarMentoriaModal({ profile, mentor, onClose, onCreated }: any) {
           <div className="input-group"><label>Tema da mentoria</label><input value={tema} onChange={e => setTema(e.target.value)} required /></div>
           <div className="input-group"><label>Objetivo da conversa</label><textarea value={objetivo} onChange={e => setObjetivo(e.target.value)} rows={2} /></div>
           <div className="input-group"><label>Desafio atual</label><textarea value={desafio} onChange={e => setDesafio(e.target.value)} rows={2} /></div>
+          <div className="input-group"><label>Competência que deseja desenvolver</label><input value={competencia} onChange={e => setCompetencia(e.target.value)} placeholder="Ex: Excel, Comunicação..." /></div>
+          <div className="input-group"><label>Relação com o seu PDI</label><textarea value={relacaoPdi} onChange={e => setRelacaoPdi(e.target.value)} rows={2} placeholder="Como essa mentoria se conecta com suas ações de desenvolvimento?" /></div>
           <div className="form-row">
             <div className="input-group"><label>Data preferida</label><input type="date" value={dataPreferida} onChange={e => setDataPreferida(e.target.value)} /></div>
             <div className="input-group"><label>Horário preferido</label><input value={horario} onChange={e => setHorario(e.target.value)} placeholder="Ex: manhã, 14h..." /></div>

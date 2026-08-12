@@ -4,6 +4,7 @@ export interface Colaborador {
   id: string; nome: string; sobrenome: string; cargo: string | null
   departamento: string | null; data_admissao: string | null; telefone: string | null
   cpf?: string | null; pis?: string | null; salario_base?: number | null
+  gestor_id?: string | null
   role: UserRole; ativo: boolean; avatar_url: string | null
   created_at: string; updated_at: string
 }

@@ -24,7 +24,7 @@ export function AdminColaboradores() {
     setErroRole('')
     const { error, data } = await supabase.from('colaboradores').update({ role }).eq('id', id).select()
     if (error || !data || data.length === 0) {
-      setErroRole('Não foi possível alterar o perfil desse colaborador. Verifique se a migração 005 foi aplicada no Supabase.')
+      setErroRole('Não foi possível alterar o perfil desse colaborador.')
       load()
       return
     }
@@ -67,34 +67,37 @@ export function AdminColaboradores() {
           <p className="empty" style={{ padding: 24 }}>Nenhum colaborador encontrado.</p>
         ) : (
           <table className="data-table" style={{ margin: 0 }}>
-            <thead><tr><th style={{ paddingLeft: 20 }}>Nome</th><th>Cargo</th><th>Departamento</th><th>Admissão</th><th>Perfil de acesso</th><th></th></tr></thead>
+            <thead><tr><th style={{ paddingLeft: 20 }}>Nome</th><th>Cargo</th><th>Departamento</th><th>Gestor</th><th>Perfil de acesso</th><th></th></tr></thead>
             <tbody>
-              {filtrados.map(c => (
-                <tr key={c.id}>
-                  <td style={{ paddingLeft: 20 }}>
-                    <div className="colab-row-name">
-                      <div className="colab-mini-avatar">{c.nome?.[0]}{c.sobrenome?.[0]}</div>
-                      <div><b>{c.nome} {c.sobrenome}</b>{c.telefone && <small>{c.telefone}</small>}</div>
-                    </div>
-                  </td>
-                  <td>{c.cargo || '—'}</td>
-                  <td>{c.departamento || '—'}</td>
-                  <td>{c.data_admissao ? new Date(c.data_admissao).toLocaleDateString('pt-BR') : '—'}</td>
-                  <td>
-                    <select value={c.role} onChange={e => alterarRole(c.id, e.target.value)} className="role-select" style={{ color: roleColor(c.role) }}>
-                      <option value="colaborador">Colaborador</option>
-                      <option value="gerente">Gerente</option>
-                      <option value="admin">Administrador</option>
-                    </select>
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <button className="icon-btn" title="Editar cargo e dados" onClick={() => setEditando(c)}><Pencil size={15} /></button>
-                      <button className="icon-btn danger" title="Remover" onClick={() => desativar(c)}><UserX size={15} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {filtrados.map(c => {
+                const gestor = lista.find(g => g.id === (c as any).gestor_id)
+                return (
+                  <tr key={c.id}>
+                    <td style={{ paddingLeft: 20 }}>
+                      <div className="colab-row-name">
+                        <div className="colab-mini-avatar">{c.nome?.[0]}{c.sobrenome?.[0]}</div>
+                        <div><b>{c.nome} {c.sobrenome}</b>{c.telefone && <small>{c.telefone}</small>}</div>
+                      </div>
+                    </td>
+                    <td>{c.cargo || '—'}</td>
+                    <td>{c.departamento || '—'}</td>
+                    <td>{gestor ? `${gestor.nome} ${gestor.sobrenome}` : '—'}</td>
+                    <td>
+                      <select value={c.role} onChange={e => alterarRole(c.id, e.target.value)} className="role-select" style={{ color: roleColor(c.role) }}>
+                        <option value="colaborador">Colaborador</option>
+                        <option value="gerente">Gerente</option>
+                        <option value="admin">Administrador</option>
+                      </select>
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <button className="icon-btn" title="Editar" onClick={() => setEditando(c)}><Pencil size={15} /></button>
+                        <button className="icon-btn danger" title="Remover" onClick={() => desativar(c)}><UserX size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         )}
@@ -102,7 +105,7 @@ export function AdminColaboradores() {
       <p className="admin-hint"><ShieldCheck size={14} /> Alterar o perfil de acesso aqui muda imediatamente o que o colaborador enxerga no portal.</p>
 
       {showAddModal && <AdicionarColaboradorModal onClose={() => setShowAddModal(false)} onCreated={load} />}
-      {editando && <EditarColaboradorModal colaborador={editando} onClose={() => setEditando(null)} onSaved={load} />}
+      {editando && <EditarColaboradorModal colaborador={editando} todos={lista} onClose={() => setEditando(null)} onSaved={load} />}
     </div>
   )
 }
@@ -163,11 +166,12 @@ function AdicionarColaboradorModal({ onClose, onCreated }: { onClose: () => void
   )
 }
 
-function EditarColaboradorModal({ colaborador, onClose, onSaved }: { colaborador: Colaborador; onClose: () => void; onSaved: () => void }) {
+function EditarColaboradorModal({ colaborador, todos, onClose, onSaved }: { colaborador: Colaborador; todos: Colaborador[]; onClose: () => void; onSaved: () => void }) {
   const [cargo, setCargo] = useState(colaborador.cargo || '')
   const [departamento, setDepartamento] = useState(colaborador.departamento || '')
   const [dataAdmissao, setDataAdmissao] = useState(colaborador.data_admissao || '')
   const [salario, setSalario] = useState(colaborador.salario_base?.toString() || '')
+  const [gestorId, setGestorId] = useState((colaborador as any).gestor_id || '')
   const [salvando, setSalvando] = useState(false); const [erro, setErro] = useState('')
 
   const salvar = async (e: React.FormEvent) => {
@@ -176,11 +180,14 @@ function EditarColaboradorModal({ colaborador, onClose, onSaved }: { colaborador
     const { error } = await supabase.from('colaboradores').update({
       cargo: cargo || null, departamento: departamento || null,
       data_admissao: dataAdmissao || null, salario_base: salario ? parseFloat(salario) : null,
+      gestor_id: gestorId || null,
     }).eq('id', colaborador.id)
     setSalvando(false)
     if (error) { setErro('Não foi possível salvar.'); return }
     onSaved(); onClose()
   }
+
+  const opcoesGestor = todos.filter(c => c.id !== colaborador.id)
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -194,6 +201,14 @@ function EditarColaboradorModal({ colaborador, onClose, onSaved }: { colaborador
           <div className="form-row">
             <div className="input-group"><label>Data de admissão</label><input type="date" value={dataAdmissao || ''} onChange={e => setDataAdmissao(e.target.value)} /></div>
             <div className="input-group"><label>Salário base (R$)</label><input type="number" step="0.01" value={salario} onChange={e => setSalario(e.target.value)} placeholder="Ex: 4500.00" /></div>
+          </div>
+          <div className="input-group">
+            <label>Gestor responsável</label>
+            <select value={gestorId} onChange={e => setGestorId(e.target.value)}>
+              <option value="">Nenhum definido</option>
+              {opcoesGestor.map(g => <option key={g.id} value={g.id}>{g.nome} {g.sobrenome}{g.cargo ? ` · ${g.cargo}` : ''}</option>)}
+            </select>
+            <small className="text-muted" style={{ fontSize: 12 }}>É esse vínculo que faz o gestor ver essa pessoa na própria equipe no PDI.</small>
           </div>
           {erro && <p className="form-error">{erro}</p>}
           <div className="modal-actions">
