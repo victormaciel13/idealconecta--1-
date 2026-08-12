@@ -50,7 +50,9 @@ export function AdminPDI() {
 
       <div className="pdi-tabs">
         <button className={tab === 'painel' ? 'active' : ''} onClick={() => setTab('painel')}><Target size={15} /> Painel</button>
-        <button className={tab === 'competencias' ? 'active' : ''} onClick={() => setTab('competencias')}><TrendingUp size={15} /> Competências</button>
+        {!isSoGestor && (
+          <button className={tab === 'competencias' ? 'active' : ''} onClick={() => setTab('competencias')}><TrendingUp size={15} /> Competências</button>
+        )}
         <button className={tab === 'mentorias' ? 'active' : ''} onClick={() => setTab('mentorias')}><Users size={15} /> Mentorias</button>
         <button className={tab === 'feedbacks' ? 'active' : ''} onClick={() => setTab('feedbacks')}><MessageSquare size={15} /> Feedbacks</button>
         <button className={tab === 'trilhas' ? 'active' : ''} onClick={() => setTab('trilhas')}><BookOpen size={15} /> Trilhas</button>
@@ -59,7 +61,7 @@ export function AdminPDI() {
       {loadingEquipe ? <p className="empty">Carregando...</p> : (
         <>
           {tab === 'painel' && <PainelTab equipe={equipe} />}
-          {tab === 'competencias' && <CompetenciasTab equipe={equipe} isSoGestor={isSoGestor} />}
+          {tab === 'competencias' && !isSoGestor && <CompetenciasTab equipe={equipe} isSoGestor={isSoGestor} />}
           {tab === 'mentorias' && <MentoriasTab equipe={equipe} isSoGestor={isSoGestor} />}
           {tab === 'feedbacks' && <FeedbacksTab equipe={equipe} isSoGestor={isSoGestor} />}
           {tab === 'trilhas' && <TrilhasTab />}
