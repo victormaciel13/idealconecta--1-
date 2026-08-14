@@ -7,6 +7,7 @@ import type { Ferias as TFerias } from '../types'
 export function Ferias() {
   const { profile } = useAuth()
   const [lista, setLista] = useState<TFerias[]>([])
+  const [faltas, setFaltas] = useState<{ data: string }[]>([])
   const [inicio, setInicio] = useState(''); const [fim, setFim] = useState('')
   const [dias, setDias] = useState(0); const [obs, setObs] = useState(''); const [msg, setMsg] = useState('')
   const [loading, setLoading] = useState(true)
@@ -15,8 +16,12 @@ export function Ferias() {
   async function load() {
     if (!profile) return
     setLoading(true)
-    const { data } = await supabase.from('ferias').select('*').eq('colaborador_id', profile.id).order('created_at', { ascending: false })
-    setLista(data || [])
+    const [feriasRes, faltasRes] = await Promise.all([
+      supabase.from('ferias').select('*').eq('colaborador_id', profile.id).order('created_at', { ascending: false }),
+      supabase.from('faltas').select('data').eq('colaborador_id', profile.id).eq('tipo', 'injustificada'),
+    ])
+    setLista(feriasRes.data || [])
+    setFaltas(faltasRes.data || [])
     setLoading(false)
   }
   useEffect(() => {
@@ -38,14 +43,18 @@ export function Ferias() {
 
   const statusColor = (s: string) => s === 'aprovada' ? 'var(--good)' : s === 'rejeitada' ? 'var(--warn)' : 'var(--muted)'
 
-  // Cálculo real do saldo, com base na data de admissão e no que já foi
-  // aprovado — segue a regra da CLT (30 dias por período de 12 meses).
+  // Cálculo real do saldo — segue a regra da CLT, incluindo a tabela de
+  // proporcionalidade por faltas injustificadas (Art. 130).
   const aprovadas = lista.filter(f => f.status === 'aprovada')
   const saldo = profile?.data_admissao
-    ? calcularSaldoFerias(profile.data_admissao, aprovadas)
+    ? calcularSaldoFerias(profile.data_admissao, aprovadas, faltas)
     : null
 
   const fmtData = (d: Date) => d.toLocaleDateString('pt-BR')
+  // O "fim" calculado internamente é o 1º dia do período seguinte (limite
+  // exclusivo, bom pra comparações). Pra EXIBIR pro colaborador, mostramos
+  // o último dia de fato daquele período — um dia antes disso.
+  const fmtDataFim = (d: Date) => new Date(d.getTime() - 86400000).toLocaleDateString('pt-BR')
 
   return (
     <div className="page">
@@ -59,6 +68,15 @@ export function Ferias() {
         <p className="empty">Calculando seu saldo...</p>
       ) : (
         <>
+          {saldo.temReducaoPorFaltas && (
+            <div className="alert-box">
+              <div>
+                <b>Seu saldo foi reduzido por faltas injustificadas.</b>
+                <p>Pela regra da CLT (Art. 130), faltas injustificadas dentro de um período aquisitivo reduzem os dias de férias daquele período. Veja o detalhe abaixo, por período.</p>
+              </div>
+            </div>
+          )}
+
           <div className="info-grid-3">
             <div className="section-card">
               <p className="eyebrow">Saldo disponível</p>
@@ -67,8 +85,8 @@ export function Ferias() {
             </div>
             <div className="section-card">
               <p className="eyebrow">Período aquisitivo atual</p>
-              <div className="info-value">{fmtData(saldo.inicioPeriodoAquisitivoAtual)} – {fmtData(saldo.fimPeriodoAquisitivoAtual)}</div>
-              <small className="text-muted">Vence em {fmtData(saldo.dataLimiteGozo)}</small>
+              <div className="info-value">{fmtData(saldo.inicioPeriodoAquisitivoAtual)} – {fmtDataFim(saldo.fimPeriodoAquisitivoAtual)}</div>
+              <small className="text-muted">Vence em {fmtDataFim(saldo.dataLimiteGozo)}</small>
             </div>
             <div className="section-card">
               <p className="eyebrow">Proporcional acumulado</p>
@@ -76,6 +94,24 @@ export function Ferias() {
               <small className="text-muted">No período em andamento (ainda não liberado)</small>
             </div>
           </div>
+
+          {saldo.periodos.length > 0 && (
+            <section className="section-card" style={{ marginTop: 16 }}>
+              <h2>Detalhe por período aquisitivo</h2>
+              <table className="data-table">
+                <thead><tr><th>Período</th><th>Faltas injustificadas</th><th>Dias de direito</th></tr></thead>
+                <tbody>
+                  {saldo.periodos.map((p, i) => (
+                    <tr key={i}>
+                      <td>{fmtData(p.inicio)} – {fmtDataFim(p.fim)}</td>
+                      <td>{p.faltasInjustificadas}</td>
+                      <td style={{ color: p.diasDireito < 30 ? 'var(--warn)' : undefined, fontWeight: p.diasDireito < 30 ? 700 : undefined }}>{p.diasDireito} dias</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          )}
 
           <div className="dash-two-col" style={{ marginTop: 22 }}>
             <section className="section-card">

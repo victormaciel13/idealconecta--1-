@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { supabase } from '../../lib/supabase'
+import { parseDataLocal } from '../../lib/ferias'
 import {
   Target, Users, MessageSquare, Award, TrendingUp, Calendar,
   ThumbsUp, Send, Plus, X, ChevronRight, Wrench, Heart
@@ -93,7 +94,7 @@ function PainelTab({ profile, pdi, acoes, proximaAcao, atrasadas, onReload }: an
         <div className="pdi-header-info">
           <b>{profile?.nome} {profile?.sobrenome}</b>
           <span>{profile?.cargo || 'Cargo não definido'} · {profile?.departamento || 'Departamento não definido'}</span>
-          <span className="text-muted">Admissão: {profile?.data_admissao ? new Date(profile.data_admissao).toLocaleDateString('pt-BR') : '—'}</span>
+          <span className="text-muted">Admissão: {profile?.data_admissao ? parseDataLocal(profile.data_admissao).toLocaleDateString('pt-BR') : '—'}</span>
         </div>
         <div className="pdi-status-badge" style={{ color: statusColor[pdi?.status || 'nao_iniciado'] }}>
           {statusLabel[pdi?.status || 'nao_iniciado']}

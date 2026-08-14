@@ -1,14 +1,17 @@
-// Cálculo de saldo de férias seguindo a regra da CLT:
+// Cálculo de saldo de férias seguindo a regra da CLT (Art. 130):
 // a cada 12 meses trabalhados (período aquisitivo completo), o
-// colaborador adquire 30 dias de férias. Esses 30 dias precisam ser
-// usados dentro dos 12 meses seguintes (período concessivo) — depois
-// disso, a lei considera a férias "vencida" (a empresa deve indenizar
-// em dobro, mas o saldo por aqui continua contando normalmente).
+// colaborador adquire direito a férias — mas a QUANTIDADE de dias
+// depende de quantas faltas injustificadas ele teve DENTRO daquele
+// período específico, segundo a tabela oficial:
 //
-// Simplificação assumida: não há desconto por faltas injustificadas
-// (a tabela de proporcionalidade da CLT por faltas não é aplicada
-// aqui — se isso for necessário, precisa de um controle de frequência
-// que o sistema ainda não tem).
+//   0 a 5 faltas   → 30 dias corridos
+//   6 a 14 faltas  → 24 dias corridos
+//   15 a 23 faltas → 18 dias corridos
+//   24 a 32 faltas → 12 dias corridos
+//   mais de 32     → perde o direito a férias naquele período
+//
+// Os 30 dias usados no período seguinte (concessivo) precisam ser
+// usados dentro dos 12 meses seguintes ao fim do período aquisitivo.
 
 export interface FeriasAprovada {
   data_inicio: string
@@ -16,8 +19,19 @@ export interface FeriasAprovada {
   dias: number
 }
 
+export interface FaltaInjustificada {
+  data: string
+}
+
+export interface PeriodoAquisitivoCalculado {
+  inicio: Date
+  fim: Date
+  faltasInjustificadas: number
+  diasDireito: number
+}
+
 export interface SaldoFerias {
-  periodosCompletos: number
+  periodos: PeriodoAquisitivoCalculado[]
   diasDireitoAcumulados: number
   diasGozados: number
   saldoDisponivel: number
@@ -26,21 +40,51 @@ export interface SaldoFerias {
   dataLimiteGozo: Date
   diasProporcionaisPeriodoAtual: number
   periodoAquisitivoCompleto: boolean
+  temReducaoPorFaltas: boolean
 }
 
-export function calcularSaldoFerias(dataAdmissao: string | Date, feriasAprovadas: FeriasAprovada[]): SaldoFerias {
-  const hoje = new Date()
-  const admissao = new Date(dataAdmissao)
+// Tabela de proporcionalidade — Art. 130 da CLT
+function diasPorFaltas(faltasInjustificadas: number): number {
+  if (faltasInjustificadas <= 5) return 30
+  if (faltasInjustificadas <= 14) return 24
+  if (faltasInjustificadas <= 23) return 18
+  if (faltasInjustificadas <= 32) return 12
+  return 0
+}
 
-  let periodosCompletos = 0
+// Datas do Postgres chegam como texto "YYYY-MM-DD". Se a gente usar
+// `new Date("YYYY-MM-DD")` direto, o JavaScript interpreta isso como
+// meia-noite em UTC — e em qualquer navegador no fuso do Brasil
+// (UTC-3), isso VOLTA um dia na hora de exibir (28/08 vira 27/08).
+// Por isso, sempre construímos a data a partir dos números soltos,
+// o que cria a data à meia-noite no fuso LOCAL, sem esse deslocamento.
+export function parseDataLocal(valor: string | Date): Date {
+  if (valor instanceof Date) return valor
+  const [ano, mes, dia] = valor.split('-').map(Number)
+  return new Date(ano, mes - 1, dia)
+}
+
+export function calcularSaldoFerias(
+  dataAdmissao: string | Date,
+  feriasAprovadas: FeriasAprovada[],
+  faltasInjustificadas: FaltaInjustificada[] = []
+): SaldoFerias {
+  const hoje = new Date()
+  const admissao = parseDataLocal(dataAdmissao)
+  const faltasDatas = faltasInjustificadas.map(f => parseDataLocal(f.data))
+
+  const contarFaltasNoIntervalo = (inicio: Date, fim: Date) =>
+    faltasDatas.filter(d => d >= inicio && d < fim).length
+
+  const periodos: PeriodoAquisitivoCalculado[] = []
   let cursor = new Date(admissao)
   while (true) {
     const proximo = new Date(cursor)
     proximo.setFullYear(proximo.getFullYear() + 1)
-    if (proximo <= hoje) {
-      periodosCompletos++
-      cursor = proximo
-    } else break
+    if (proximo > hoje) break
+    const faltas = contarFaltasNoIntervalo(cursor, proximo)
+    periodos.push({ inicio: new Date(cursor), fim: new Date(proximo), faltasInjustificadas: faltas, diasDireito: diasPorFaltas(faltas) })
+    cursor = proximo
   }
 
   const inicioPeriodoAtual = new Date(cursor)
@@ -50,22 +94,22 @@ export function calcularSaldoFerias(dataAdmissao: string | Date, feriasAprovadas
   const dataLimiteGozo = new Date(fimPeriodoAtual)
   dataLimiteGozo.setFullYear(dataLimiteGozo.getFullYear() + 1)
 
-  const diasDireitoAcumulados = periodosCompletos * 30
+  const diasDireitoAcumulados = periodos.reduce((s, p) => s + p.diasDireito, 0)
   const diasGozados = feriasAprovadas.reduce((soma, f) => soma + (f.dias || 0), 0)
   const saldoDisponivel = Math.max(0, diasDireitoAcumulados - diasGozados)
 
-  // Dias proporcionais já "ganhos" dentro do período aquisitivo em
-  // andamento (2,5 dias por mês completo) — informativo, ainda não
-  // pode ser tirado até completar o período.
   const mesesNoPeriodoAtual = Math.max(0,
     (hoje.getFullYear() - inicioPeriodoAtual.getFullYear()) * 12 + (hoje.getMonth() - inicioPeriodoAtual.getMonth())
   )
-  const diasProporcionaisPeriodoAtual = Math.min(30, Math.floor(mesesNoPeriodoAtual * 2.5))
+  const faltasPeriodoAtual = contarFaltasNoIntervalo(inicioPeriodoAtual, fimPeriodoAtual)
+  const tetoProporcional = diasPorFaltas(faltasPeriodoAtual)
+  const diasProporcionaisPeriodoAtual = Math.min(tetoProporcional, Math.floor(mesesNoPeriodoAtual * (tetoProporcional / 12)))
 
   return {
-    periodosCompletos, diasDireitoAcumulados, diasGozados, saldoDisponivel,
+    periodos, diasDireitoAcumulados, diasGozados, saldoDisponivel,
     inicioPeriodoAquisitivoAtual: inicioPeriodoAtual, fimPeriodoAquisitivoAtual: fimPeriodoAtual,
     dataLimiteGozo, diasProporcionaisPeriodoAtual,
-    periodoAquisitivoCompleto: periodosCompletos > 0,
+    periodoAquisitivoCompleto: periodos.length > 0,
+    temReducaoPorFaltas: periodos.some(p => p.diasDireito < 30),
   }
 }
