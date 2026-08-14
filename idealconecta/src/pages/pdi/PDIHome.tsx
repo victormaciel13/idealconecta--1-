@@ -188,9 +188,34 @@ function NovaAcaoModal({ pdiId, onClose, onCreated }: { pdiId: string; onClose: 
 
 // Lista simples de Hard Skills e Soft Skills atribuídas pelo admin a esse
 // colaborador especificamente — sem nota, sem comparação, só a lista.
+const HARD_SKILLS_PADRAO = [
+  'Excel', 'Pacote Office', 'Sistemas de folha de pagamento', 'Sistemas de ponto',
+  'Legislação trabalhista (CLT)', 'Recrutamento e seleção (ATS)', 'Atendimento ao cliente',
+  'Redação de documentos e relatórios', 'Organização de arquivos e processos', 'Indicadores e relatórios (KPIs)',
+]
+const SOFT_SKILLS_PADRAO = [
+  'Comunicação', 'Resiliência', 'Trabalho em equipe', 'Organização', 'Proatividade',
+  'Senso de urgência', 'Adaptabilidade', 'Ética e confidencialidade', 'Orientação a resultados',
+  'Inteligência emocional', 'Atenção a detalhes', 'Gestão do tempo',
+]
+const AREA_SKILLS_PADRAO = [
+  'Recrutamento e seleção', 'Administração de pessoal', 'Fechamento de folha de pagamento',
+  'Gestão de benefícios', 'Prospecção comercial', 'Negociação com clientes',
+  'Legislação trabalhista aplicada', 'Gestão de indicadores da área',
+  'Atendimento a clientes internos/externos', 'Processos operacionais e logística',
+]
+function catalogoPorTipo(tipo: 'tecnica' | 'comportamental' | 'area') {
+  if (tipo === 'tecnica') return HARD_SKILLS_PADRAO
+  if (tipo === 'comportamental') return SOFT_SKILLS_PADRAO
+  return AREA_SKILLS_PADRAO
+}
+
+// Autoavaliação — o próprio colaborador marca as competências que ele
+// acredita ter, nas mesmas 3 categorias usadas pelo admin/gestor.
 function CompetenciasTab({ profile }: any) {
   const [skills, setSkills] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [picker, setPicker] = useState<'tecnica' | 'comportamental' | 'area' | null>(null)
 
   useEffect(() => { load() }, [profile])
   async function load() {
@@ -200,35 +225,59 @@ function CompetenciasTab({ profile }: any) {
     setLoading(false)
   }
 
+  const doTipo = (tipo: string) => skills.filter(s => s.tipo === tipo)
+
+  const remover = async (id: string) => {
+    await supabase.from('colaborador_skills').delete().eq('id', id)
+    load()
+  }
+
+  const adicionar = async (nome: string, tipo: 'tecnica' | 'comportamental' | 'area') => {
+    await supabase.from('colaborador_skills').insert({ colaborador_id: profile.id, nome, tipo })
+    setPicker(null)
+    load()
+  }
+
   if (loading) return <p className="empty">Carregando...</p>
-
-  const hard = skills.filter(s => s.tipo === 'tecnica')
-  const soft = skills.filter(s => s.tipo === 'comportamental')
-
-  if (skills.length === 0) return (
-    <section className="section-card">
-      <p className="empty">Suas Hard e Soft Skills ainda não foram cadastradas. Isso é feito pelo seu gestor ou pelo RH.</p>
-    </section>
-  )
 
   return (
     <>
-      <section className="section-card">
-        <div className="section-head"><h2><Wrench size={16} /> Hard Skills</h2></div>
-        {hard.length === 0 ? <p className="empty">Nenhuma cadastrada ainda.</p> : (
-          <div className="skill-tag-list">
-            {hard.map(s => <span key={s.id} className="skill-tag tecnica">{s.nome}</span>)}
+      <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>Marque as competências que você acredita ter — essa é a sua autoavaliação, e ela também aparece pro seu gestor.</p>
+      <div className="perfil-card" style={{ maxWidth: 520 }}>
+        {(['tecnica', 'comportamental', 'area'] as const).map(tipo => (
+          <div key={tipo} className={`team-comp-section tcs-${tipo}`}>
+            <span className="team-comp-label">
+              {tipo === 'tecnica' && <><Wrench size={12} /> Hard Skills</>}
+              {tipo === 'comportamental' && <><Heart size={12} /> Soft Skills</>}
+              {tipo === 'area' && <><Award size={12} /> Competência de área</>}
+            </span>
+            <div className="top3-chips">
+              {doTipo(tipo).map(s => (
+                <span key={s.id} className={`skill-tag ${tipo} removable`}>
+                  {s.nome} <button onClick={() => remover(s.id)}><X size={11} /></button>
+                </span>
+              ))}
+              {doTipo(tipo).length === 0 && <span className="team-comp-empty">Nenhuma ainda</span>}
+            </div>
+            <button className="add-skill-btn" onClick={() => setPicker(tipo)}><Plus size={12} /> Adicionar skill</button>
           </div>
-        )}
-      </section>
-      <section className="section-card" style={{ marginTop: 16 }}>
-        <div className="section-head"><h2><Heart size={16} /> Soft Skills</h2></div>
-        {soft.length === 0 ? <p className="empty">Nenhuma cadastrada ainda.</p> : (
-          <div className="skill-tag-list">
-            {soft.map(s => <span key={s.id} className="skill-tag comportamental">{s.nome}</span>)}
+        ))}
+      </div>
+
+      {picker && (
+        <div className="modal-overlay" onClick={() => setPicker(null)}>
+          <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <h3>Adicionar competência</h3>
+            <p className="text-muted" style={{ fontSize: 13, marginTop: -6, marginBottom: 14 }}>Escolha uma competência pra adicionar à sua autoavaliação</p>
+            <div className="skill-toggle-grid">
+              {catalogoPorTipo(picker).filter(nome => !doTipo(picker).some(s => s.nome === nome)).map(nome => (
+                <button key={nome} type="button" className="skill-toggle" onClick={() => adicionar(nome, picker)}>{nome}</button>
+              ))}
+            </div>
+            <div className="modal-actions"><button type="button" className="btn-ghost" onClick={() => setPicker(null)}>Fechar</button></div>
           </div>
-        )}
-      </section>
+        </div>
+      )}
     </>
   )
 }

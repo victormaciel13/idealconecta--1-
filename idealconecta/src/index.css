@@ -777,3 +777,142 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .skill-toggle.soft.checked { background: var(--good-soft); border-color: var(--good); color: var(--good); }
 
 .colab-badge { background: var(--primary-2) !important; color: #fff !important; font-weight: 700; font-size: 14px; }
+
+/* ============================================================
+   PDI ADMIN — evolução, filtros, trilhas
+   ============================================================ */
+.evo-list { display: flex; flex-direction: column; gap: 12px; }
+.evo-row { display: flex; align-items: center; gap: 14px; }
+.evo-nome { font-size: 13px; font-weight: 600; width: 160px; flex: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.evo-pct { font-size: 13px; font-weight: 700; color: var(--primary-2); width: 40px; flex: none; text-align: right; }
+
+.filter-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.filter-row .role-select { padding: 8px 12px; }
+
+.trilha-list { display: flex; flex-direction: column; gap: 14px; }
+.trilha-card { display: flex; gap: 14px; padding: 16px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); }
+.trilha-cursos { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--ink); }
+.trilha-cursos li { margin-bottom: 3px; }
+
+/* ============================================================
+   MENTORIA — card clicável, ações do admin, avaliação
+   ============================================================ */
+.approval-card-clickable { width: 100%; text-align: left; cursor: pointer; font-family: inherit; display: block; }
+.approval-card-clickable:hover { border-color: var(--primary-2); }
+.mentoria-actions-grid { display: flex; gap: 10px; }
+.star-rating { display: flex; gap: 4px; }
+.star { font-size: 22px; color: var(--line); background: none; border: 0; cursor: pointer; padding: 0; line-height: 1; }
+.star.filled { color: var(--accent); }
+
+/* ============================================================
+   COMPETÊNCIAS — Top 3 por categoria + Metas (drag and drop)
+   ============================================================ */
+.pdi-subtabs { display: flex; gap: 6px; margin-bottom: 18px; }
+.pdi-subtabs button {
+  display: flex; align-items: center; gap: 5px; padding: 8px 14px; border-radius: 20px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+.pdi-subtabs button.active { background: var(--primary-2); color: #fff; border-color: var(--primary-2); }
+.pdi-subtabs button:hover:not(.active) { border-color: var(--primary-2); color: var(--primary-2); }
+
+.skill-tag.area { background: var(--warn-soft); color: var(--warn); }
+.skill-toggle.area.checked { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+
+.top3-table { width: 100%; border-collapse: collapse; }
+.top3-table th { text-align: left; font-size: 12px; font-weight: 700; color: var(--muted); padding: 8px 12px; border-bottom: 2px solid var(--line); white-space: nowrap; }
+.top3-table th svg { margin-right: 4px; vertical-align: -2px; }
+.top3-table td { padding: 10px 12px; border-bottom: 1px solid var(--line-2); vertical-align: top; min-width: 180px; }
+.top3-nome { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.top3-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.top3-add {
+  width: 26px; height: 26px; border-radius: 50%; border: 1.5px dashed var(--line);
+  background: none; color: var(--muted); display: grid; place-items: center; cursor: pointer;
+}
+.top3-add:hover { border-color: var(--primary-2); color: var(--primary-2); }
+
+.meta-palette { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; padding: 16px; background: var(--bg); border-radius: var(--radius-sm); }
+.meta-palette-col { display: flex; flex-direction: column; gap: 6px; }
+.meta-palette-title { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.meta-chip {
+  display: flex; align-items: center; gap: 6px; padding: 7px 10px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; cursor: grab; user-select: none;
+}
+.meta-chip:active { cursor: grabbing; }
+.meta-chip svg { color: var(--muted); flex: none; }
+.meta-dropzone {
+  min-height: 42px; min-width: 140px; border: 1.5px dashed var(--line); border-radius: 10px;
+  display: flex; align-items: center; padding: 6px; transition: border-color .15s, background .15s;
+}
+.meta-dropzone.over { border-color: var(--primary-2); background: var(--purple-soft); }
+.meta-placeholder { font-size: 12px; color: var(--muted); margin: 0 auto; }
+
+/* ============================================================
+   COMPETÊNCIAS — cards por colaborador (redesign)
+   ============================================================ */
+.team-comp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.team-comp-card { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+.team-comp-head { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--line-2); }
+.colab-mini-avatar-lg {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--primary-2); color: #fff;
+  display: grid; place-items: center; font-weight: 700; font-size: 14px; flex: none;
+}
+.team-comp-head b { font-size: 14.5px; display: block; }
+.team-comp-head small { font-size: 12px; color: var(--muted); }
+
+.team-comp-section { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 12px; }
+.tcs-tecnica { background: var(--purple-soft); }
+.tcs-comportamental { background: var(--good-soft); }
+.tcs-area { background: var(--warn-soft); }
+.team-comp-label { display: flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; color: var(--ink); text-transform: uppercase; letter-spacing: .03em; }
+.team-comp-empty { font-size: 11.5px; color: var(--muted); font-style: italic; }
+
+.meta-palette { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.meta-palette-col { display: flex; flex-direction: column; gap: 6px; }
+.meta-palette-title { display: flex; align-items: center; gap: 5px; font-size: 12px; margin-bottom: 6px; padding: 4px 0; }
+.meta-palette-title.mpt-tecnica { color: var(--primary-2); }
+.meta-palette-title.mpt-comportamental { color: var(--good); }
+.meta-palette-title.mpt-area { color: var(--warn); }
+.meta-chip {
+  display: flex; align-items: center; gap: 6px; padding: 8px 11px; border-radius: 9px;
+  font-size: 12.5px; cursor: grab; user-select: none; border: 1px solid transparent;
+}
+.meta-chip:active { cursor: grabbing; }
+.meta-chip svg { flex: none; opacity: .5; }
+.mc-tecnica { background: var(--purple-soft); color: var(--primary-2); }
+.mc-comportamental { background: var(--good-soft); color: var(--good); }
+.mc-area { background: var(--warn-soft); color: var(--warn); }
+.meta-chip:hover { border-color: currentColor; }
+
+.meta-dropzone {
+  min-height: 46px; border: 1.5px dashed rgba(0,0,0,.12); border-radius: 10px;
+  display: flex; align-items: center; padding: 8px; transition: border-color .15s, background .15s, transform .1s;
+  background: rgba(255,255,255,.5);
+}
+.meta-dropzone.over { border-color: var(--primary-2); background: #fff; transform: scale(1.02); }
+.meta-placeholder { font-size: 12px; color: var(--muted); margin: 0 auto; }
+
+/* ============================================================
+   PERFIS DE PDI — quadro único (substitui Top3 + Metas)
+   ============================================================ */
+.perfis-header { margin-bottom: 18px; }
+.perfis-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 22px; }
+.perfil-card {
+  background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  border: 2px solid transparent; transition: border-color .15s, transform .1s;
+}
+.perfil-card.drag-over { border-color: var(--primary-2); transform: scale(1.01); }
+.perfil-card-head { display: flex; align-items: center; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line-2); }
+.perfil-card-head b { font-size: 14.5px; display: block; }
+.perfil-card-head small { font-size: 12px; color: var(--muted); }
+
+.add-skill-btn {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px dashed var(--line); border-radius: 8px; background: var(--surface);
+  color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px; cursor: pointer; margin-top: 2px;
+}
+.add-skill-btn:hover { border-color: var(--primary-2); color: var(--primary-2); background: var(--purple-soft); }
+
+.perfis-palette { margin-top: 4px; }
