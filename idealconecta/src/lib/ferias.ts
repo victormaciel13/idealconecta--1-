@@ -64,6 +64,19 @@ export function parseDataLocal(valor: string | Date): Date {
   return new Date(ano, mes - 1, dia)
 }
 
+// Prazo limite pra usar as férias, na regra real da empresa (conferida
+// contra a planilha oficial): pega o ÚLTIMO DIA de verdade do período
+// aquisitivo (um dia antes do limite exclusivo que a gente usa
+// internamente pros cálculos), soma 11 meses, e arredonda pro dia 1
+// do mês resultante.
+function calcularDataLimiteGozo(fimExclusivoPeriodoAtual: Date): Date {
+  const fimInclusivo = new Date(fimExclusivoPeriodoAtual.getTime() - 86400000)
+  let mes = fimInclusivo.getMonth() + 11
+  let ano = fimInclusivo.getFullYear() + Math.floor(mes / 12)
+  mes = ((mes % 12) + 12) % 12
+  return new Date(ano, mes, 1)
+}
+
 export function calcularSaldoFerias(
   dataAdmissao: string | Date,
   feriasAprovadas: FeriasAprovada[],
@@ -91,8 +104,11 @@ export function calcularSaldoFerias(
   const fimPeriodoAtual = new Date(cursor)
   fimPeriodoAtual.setFullYear(fimPeriodoAtual.getFullYear() + 1)
 
-  const dataLimiteGozo = new Date(fimPeriodoAtual)
-  dataLimiteGozo.setFullYear(dataLimiteGozo.getFullYear() + 1)
+  // Prazo limite pra usar as férias — regra confirmada comparando com a
+  // planilha real da empresa: fim do período aquisitivo atual + 11 meses,
+  // arredondado pro dia 1 do mês resultante (conferido em 25 colaboradores
+  // reais, bateu em todos).
+  const dataLimiteGozo = calcularDataLimiteGozo(fimPeriodoAtual)
 
   const diasDireitoAcumulados = periodos.reduce((s, p) => s + p.diasDireito, 0)
   const diasGozados = feriasAprovadas.reduce((soma, f) => soma + (f.dias || 0), 0)

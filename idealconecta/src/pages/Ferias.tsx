@@ -86,7 +86,7 @@ export function Ferias() {
             <div className="section-card">
               <p className="eyebrow">Período aquisitivo atual</p>
               <div className="info-value">{fmtData(saldo.inicioPeriodoAquisitivoAtual)} – {fmtDataFim(saldo.fimPeriodoAquisitivoAtual)}</div>
-              <small className="text-muted">Vence em {fmtDataFim(saldo.dataLimiteGozo)}</small>
+              <small className="text-muted">Vence em {fmtData(saldo.dataLimiteGozo)}</small>
             </div>
             <div className="section-card">
               <p className="eyebrow">Proporcional acumulado</p>
