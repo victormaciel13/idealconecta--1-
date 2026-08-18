@@ -14,6 +14,7 @@ export function AdicionarAniversarianteModal({ onClose, onCreated }: { onClose: 
   const [departamento, setDepartamento] = useState('')
   const [dia, setDia] = useState('')
   const [mes, setMes] = useState(String(new Date().getMonth() + 1))
+  const [mensagem, setMensagem] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [erro, setErro] = useState('')
@@ -44,6 +45,7 @@ export function AdicionarAniversarianteModal({ onClose, onCreated }: { onClose: 
 
     const { error: insertError } = await supabase.from('aniversariantes').insert({
       nome: nome.trim(), departamento: departamento.trim() || null, dia: diaNum, mes: parseInt(mes, 10), foto_url,
+      mensagem: mensagem.trim() || null,
     })
 
     setEnviando(false)
@@ -70,6 +72,11 @@ export function AdicionarAniversarianteModal({ onClose, onCreated }: { onClose: 
                 {meses.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
               </select>
             </div>
+          </div>
+          <div className="input-group">
+            <label>Mensagem de aniversário (opcional)</label>
+            <textarea value={mensagem} onChange={e => setMensagem(e.target.value)} rows={2} placeholder="Ex: Desejamos um dia repleto de alegria! 🎉" />
+            <small className="text-muted" style={{ fontSize: 12 }}>Aparece quando alguém clicar nessa pessoa na lista de aniversariantes.</small>
           </div>
           <div className="input-group">
             <label>Foto (opcional)</label>

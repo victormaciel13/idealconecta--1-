@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import type { Comunicado, Ferias } from '../types'
 import { AdicionarAniversarianteModal } from '../components/AdicionarAniversarianteModal'
+import { AniversarianteDetalheModal } from '../components/AniversarianteDetalheModal'
 
 export function Dashboard() {
   const { profile } = useAuth()
@@ -18,6 +19,7 @@ export function Dashboard() {
   const [fotos, setFotos] = useState<any[]>([])
   const [aniversariantes, setAniversariantes] = useState<any[]>([])
   const [showAddAniv, setShowAddAniv] = useState(false)
+  const [anivDetalhe, setAnivDetalhe] = useState<any>(null)
 
   useEffect(() => { loadAll() }, [profile])
 
@@ -172,7 +174,7 @@ export function Dashboard() {
             ) : (
               <div className="bday-rail-list">
                 {aniversariantes.map((b) => (
-                  <div key={b.id} className="bday-rail-item">
+                  <div key={b.id} className="bday-rail-item" onClick={() => setAnivDetalhe(b)} style={{ cursor: 'pointer' }}>
                     {b.foto_url ? (
                       <img src={b.foto_url} alt={b.nome} className="bday-photo" />
                     ) : (
@@ -180,7 +182,7 @@ export function Dashboard() {
                     )}
                     <div><b>{b.nome}</b><small>{b.departamento || '—'}</small></div>
                     <span className="bday-rail-date">{String(b.dia).padStart(2, '0')}/{String(b.mes).padStart(2, '0')}</span>
-                    {isAdmin && <button className="bday-remove" onClick={() => removerAniversariante(b.id)}><X size={13} /></button>}
+                    {isAdmin && <button className="bday-remove" onClick={(e) => { e.stopPropagation(); removerAniversariante(b.id) }}><X size={13} /></button>}
                   </div>
                 ))}
               </div>
@@ -197,6 +199,7 @@ export function Dashboard() {
       </div>
 
       {showAddAniv && <AdicionarAniversarianteModal onClose={() => setShowAddAniv(false)} onCreated={loadAniversariantes} />}
+      {anivDetalhe && <AniversarianteDetalheModal aniversariante={anivDetalhe} onClose={() => setAnivDetalhe(null)} />}
     </div>
   )
 }
