@@ -199,7 +199,14 @@ export function Dashboard() {
       </div>
 
       {showAddAniv && <AdicionarAniversarianteModal onClose={() => setShowAddAniv(false)} onCreated={loadAniversariantes} />}
-      {anivDetalhe && <AniversarianteDetalheModal aniversariante={anivDetalhe} onClose={() => setAnivDetalhe(null)} />}
+      {anivDetalhe && (
+        <AniversarianteDetalheModal
+          aniversariante={anivDetalhe}
+          isAdmin={isAdmin}
+          onClose={() => setAnivDetalhe(null)}
+          onUpdated={() => { loadAniversariantes(); setAnivDetalhe(null) }}
+        />
+      )}
     </div>
   )
 }
