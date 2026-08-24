@@ -12,6 +12,7 @@ export function Galeria() {
   const [titulo, setTitulo] = useState(''); const [descricao, setDescricao] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false); const [msg, setMsg] = useState('')
+  const [msgTipo, setMsgTipo] = useState<'ok' | 'erro'>('ok')
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -30,18 +31,27 @@ export function Galeria() {
     const { error: uploadError } = await supabase.storage.from('galeria').upload(path, file)
 
     if (uploadError) {
-      setMsg('Erro no upload. Verifique se o bucket "galeria" foi criado no Storage do Supabase (veja migration_003).')
+      console.error('Erro no upload da foto (galeria):', uploadError)
+      setMsgTipo('erro')
+      setMsg(`Erro no upload: ${uploadError.message}`)
       setUploading(false)
       return
     }
 
     const { data: pub } = supabase.storage.from('galeria').getPublicUrl(path)
     const { error: insertError } = await supabase.from('galeria').insert({
-      titulo, descricao, imagem_url: pub.publicUrl, autor_id: profile.id,
+      titulo, descricao: descricao || null, imagem_url: pub.publicUrl, autor_id: profile.id,
     })
 
-    if (insertError) setMsg('Foto enviada, mas houve erro ao salvar os dados.')
-    else { setMsg('Foto publicada!'); setTitulo(''); setDescricao(''); setFile(null); load() }
+    if (insertError) {
+      console.error('Erro ao salvar registro da foto (galeria):', insertError)
+      setMsgTipo('erro')
+      setMsg(`Foto enviada, mas houve erro ao salvar os dados: ${insertError.message}`)
+    } else {
+      setMsgTipo('ok')
+      setMsg('Foto publicada!')
+      setTitulo(''); setDescricao(''); setFile(null); load()
+    }
     setUploading(false)
   }
 
@@ -71,7 +81,7 @@ export function Galeria() {
             <button type="submit" className="btn-primary" disabled={uploading || !file}>
               <ImagePlus size={16} /> {uploading ? 'Enviando...' : 'Publicar foto'}
             </button>
-            {msg && <p className="form-msg">{msg}</p>}
+            {msg && <p className={msgTipo === 'erro' ? 'form-error' : 'form-msg'}>{msg}</p>}
           </form>
         </section>
       )}
