@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Award, Plus, Upload, Pencil, Trash2 } from 'lucide-react'
+import { redimensionarImagem } from '../lib/imagem'
 
 const cores = ['#1C6DD0', '#2C5282', '#0B2545', '#3B7DD8', '#7C3AED', '#4C1D95']
 
@@ -120,8 +121,9 @@ function ReconhecimentoModal({ reconhecimento, onClose, onSaved, profile }: { re
 
     let foto_url = reconhecimento?.foto_url || null
     if (file) {
-      const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
-      const { error: uploadError } = await supabase.storage.from('reconhecimentos').upload(path, file)
+      const fileRedimensionado = await redimensionarImagem(file, 400)
+      const path = `${Date.now()}-${fileRedimensionado.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error: uploadError } = await supabase.storage.from('reconhecimentos').upload(path, fileRedimensionado)
       if (uploadError) {
         console.error('Erro no upload da foto:', uploadError)
         setErro(`Erro no upload da foto: ${uploadError.message}`)
