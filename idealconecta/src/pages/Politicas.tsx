@@ -30,7 +30,8 @@ export function Politicas() {
     const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
     const { error: uploadError } = await supabase.storage.from('politicas').upload(path, file)
     if (uploadError) {
-      setMsg('Erro no upload. Verifique se o bucket "politicas" foi criado (migration_006).')
+      console.error('Erro no upload:', uploadError)
+      setMsg(`Erro no upload: ${uploadError.message}`)
       setEnviando(false)
       return
     }
@@ -40,25 +41,43 @@ export function Politicas() {
       titulo, categoria: categoria || null, arquivo_url: pub.publicUrl,
     })
 
-    if (insertError) setMsg('Arquivo enviado, mas houve erro ao salvar o registro.')
-    else { setMsg('Documento publicado!'); setTitulo(''); setCategoria(''); setFile(null); load() }
+    if (insertError) {
+      console.error('Erro ao salvar documento:', insertError)
+      setMsg(`Arquivo enviado, mas houve erro ao salvar: ${insertError.message}`)
+    } else {
+      setMsg('Documento publicado!'); setTitulo(''); setCategoria(''); setFile(null); load()
+    }
     setEnviando(false)
   }
 
+  // Reescrita com proteção contra crash silencioso: antes, se o registro
+  // não tivesse arquivo_url válido, o código quebrava sem avisar nada — a
+  // lixeira "não fazia nada" na tela, sem mensagem de erro nenhuma.
   const excluir = async (item: any) => {
     if (!confirm(`Excluir o documento "${item.titulo}"? Essa ação não pode ser desfeita.`)) return
 
-    // Remove o arquivo do Storage também, extraindo o caminho a partir da URL pública
-    const marker = '/politicas/'
-    const idx = item.arquivo_url.indexOf(marker)
-    if (idx !== -1) {
-      const storagePath = item.arquivo_url.slice(idx + marker.length)
-      await supabase.storage.from('politicas').remove([storagePath])
-    }
+    try {
+      if (item.arquivo_url) {
+        const marker = '/politicas/'
+        const idx = item.arquivo_url.indexOf(marker)
+        if (idx !== -1) {
+          const storagePath = item.arquivo_url.slice(idx + marker.length)
+          const { error: storageError } = await supabase.storage.from('politicas').remove([storagePath])
+          if (storageError) console.error('Aviso: não removeu o arquivo do Storage:', storageError)
+        }
+      }
 
-    const { error } = await supabase.from('politicas').delete().eq('id', item.id)
-    if (error) alert('Não foi possível excluir. Tente novamente.')
-    else load()
+      const { error } = await supabase.from('politicas').delete().eq('id', item.id)
+      if (error) {
+        console.error('Erro ao excluir documento:', error)
+        alert(`Não foi possível excluir: ${error.message}`)
+        return
+      }
+      load()
+    } catch (err: any) {
+      console.error('Erro inesperado ao excluir:', err)
+      alert(`Erro inesperado ao excluir: ${err?.message || err}`)
+    }
   }
 
   return (
@@ -97,9 +116,11 @@ export function Politicas() {
               <div className="decl-icon"><FileText size={20} /></div>
               <div><b>{p.titulo}</b><small>{p.categoria || '—'}</small></div>
               <div className="row-actions" style={{ marginLeft: 'auto' }}>
-                <a href={p.arquivo_url} target="_blank" rel="noopener noreferrer" className="btn-ghost">
-                  <Download size={14} /> Baixar
-                </a>
+                {p.arquivo_url && (
+                  <a href={p.arquivo_url} target="_blank" rel="noopener noreferrer" className="btn-ghost">
+                    <Download size={14} /> Baixar
+                  </a>
+                )}
                 {isAdmin && (
                   <>
                     <button className="icon-btn" title="Editar" onClick={() => setEditando(p)}><Pencil size={15} /></button>
@@ -131,14 +152,14 @@ function EditarPoliticaModal({ item, onClose, onSaved }: { item: any; onClose: (
     if (novoFile) {
       const path = `${Date.now()}-${novoFile.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
       const { error: uploadError } = await supabase.storage.from('politicas').upload(path, novoFile)
-      if (uploadError) { setErro('Erro ao enviar o novo arquivo.'); setSalvando(false); return }
+      if (uploadError) { setErro(`Erro ao enviar o novo arquivo: ${uploadError.message}`); setSalvando(false); return }
       const { data: pub } = supabase.storage.from('politicas').getPublicUrl(path)
       arquivo_url = pub.publicUrl
     }
 
     const { error } = await supabase.from('politicas').update({ titulo, categoria: categoria || null, arquivo_url }).eq('id', item.id)
     setSalvando(false)
-    if (error) { setErro('Não foi possível salvar as alterações.'); return }
+    if (error) { setErro(`Não foi possível salvar: ${error.message}`); return }
     onSaved(); onClose()
   }
 
