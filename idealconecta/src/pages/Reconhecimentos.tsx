@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
-import { Award, Plus, Upload } from 'lucide-react'
+import { Award, Plus, Upload, Pencil, Trash2 } from 'lucide-react'
 
 const cores = ['#1C6DD0', '#2C5282', '#0B2545', '#3B7DD8', '#7C3AED', '#4C1D95']
 
@@ -11,6 +11,7 @@ export function Reconhecimentos() {
   const [lista, setLista] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [editando, setEditando] = useState<any>(null)
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -18,6 +19,28 @@ export function Reconhecimentos() {
     const { data } = await supabase.from('reconhecimentos').select('*').order('created_at', { ascending: false })
     setLista(data || [])
     setLoading(false)
+  }
+
+  const excluir = async (r: any) => {
+    if (!confirm(`Excluir o reconhecimento de "${r.nome_colaborador}"? Essa ação não pode ser desfeita.`)) return
+
+    try {
+      if (r.foto_url) {
+        const marker = '/reconhecimentos/'
+        const idx = r.foto_url.indexOf(marker)
+        if (idx !== -1) {
+          const storagePath = r.foto_url.slice(idx + marker.length)
+          const { error: storageError } = await supabase.storage.from('reconhecimentos').remove([storagePath])
+          if (storageError) console.error('Aviso: não removeu a foto do Storage:', storageError)
+        }
+      }
+      const { error } = await supabase.from('reconhecimentos').delete().eq('id', r.id)
+      if (error) { console.error('Erro ao excluir reconhecimento:', error); alert(`Não foi possível excluir: ${error.message}`); return }
+      load()
+    } catch (err: any) {
+      console.error('Erro inesperado ao excluir:', err)
+      alert(`Erro inesperado: ${err?.message || err}`)
+    }
   }
 
   return (
@@ -44,11 +67,13 @@ export function Reconhecimentos() {
             const ini = nome.split(' ').filter(Boolean).map((p: string) => p[0]).slice(0, 2).join('')
             return (
               <div key={r.id} className="rec-card section-card">
-                {r.foto_url ? (
-                  <img src={r.foto_url} alt={nome} className="rec-foto" />
-                ) : (
-                  <div className="rec-avatar" style={{ background: cores[i % cores.length] }}>{ini}</div>
-                )}
+                <div className="rec-foto-wrap">
+                  {r.foto_url ? (
+                    <img src={r.foto_url} alt={nome} className="rec-foto" />
+                  ) : (
+                    <div className="rec-avatar" style={{ background: cores[i % cores.length] }}>{ini}</div>
+                  )}
+                </div>
                 <div className="rec-info">
                   <b>{nome}</b>
                   <div className="rec-move">
@@ -58,30 +83,42 @@ export function Reconhecimentos() {
                   </div>
                   <span className="rec-date">{new Date(r.created_at).toLocaleDateString('pt-BR')}</span>
                 </div>
-                <div className="rec-medal"><Award size={22} /></div>
+                {isAdmin ? (
+                  <div className="row-actions">
+                    <button className="icon-btn" title="Editar" onClick={() => setEditando(r)}><Pencil size={14} /></button>
+                    <button className="icon-btn danger" title="Excluir" onClick={() => excluir(r)}><Trash2 size={14} /></button>
+                  </div>
+                ) : (
+                  <div className="rec-medal"><Award size={22} /></div>
+                )}
               </div>
             )
           })}
         </div>
       )}
 
-      {showModal && <LancarReconhecimentoModal onClose={() => setShowModal(false)} onCreated={load} profile={profile} />}
+      {showModal && <ReconhecimentoModal onClose={() => setShowModal(false)} onSaved={load} profile={profile} />}
+      {editando && <ReconhecimentoModal reconhecimento={editando} onClose={() => setEditando(null)} onSaved={load} profile={profile} />}
     </div>
   )
 }
 
-function LancarReconhecimentoModal({ onClose, onCreated, profile }: { onClose: () => void; onCreated: () => void; profile: any }) {
-  const [nome, setNome] = useState('')
-  const [cargoDe, setCargoDe] = useState(''); const [cargoPara, setCargoPara] = useState('')
+function ReconhecimentoModal({ reconhecimento, onClose, onSaved, profile }: { reconhecimento?: any; onClose: () => void; onSaved: () => void; profile: any }) {
+  const jaTemDeCargo = reconhecimento?.descricao?.includes('→')
+  const [nome, setNome] = useState(reconhecimento?.nome_colaborador || '')
+  const [cargoDe, setCargoDe] = useState(jaTemDeCargo ? reconhecimento.descricao.split('→')[0].trim() : '')
+  const [cargoPara, setCargoPara] = useState(
+    jaTemDeCargo ? reconhecimento.descricao.split('→')[1].trim() : (reconhecimento?.descricao || '')
+  )
   const [file, setFile] = useState<File | null>(null)
   const [salvando, setSalvando] = useState(false); const [erro, setErro] = useState('')
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!nome.trim() || !cargoPara.trim() || !profile) return
+    if (!nome.trim() || !cargoPara.trim()) return
     setSalvando(true); setErro('')
 
-    let foto_url: string | null = null
+    let foto_url = reconhecimento?.foto_url || null
     if (file) {
       const path = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
       const { error: uploadError } = await supabase.storage.from('reconhecimentos').upload(path, file)
@@ -96,22 +133,24 @@ function LancarReconhecimentoModal({ onClose, onCreated, profile }: { onClose: (
     }
 
     const descricao = cargoDe.trim() ? `${cargoDe.trim()} → ${cargoPara.trim()}` : cargoPara.trim()
-    const { error } = await supabase.from('reconhecimentos').insert({
-      nome_colaborador: nome.trim(), tipo: 'Promoção', descricao, foto_url, autor_id: profile.id,
-    })
+
+    const { error } = reconhecimento
+      ? await supabase.from('reconhecimentos').update({ nome_colaborador: nome.trim(), descricao, foto_url }).eq('id', reconhecimento.id)
+      : await supabase.from('reconhecimentos').insert({ nome_colaborador: nome.trim(), tipo: 'Promoção', descricao, foto_url, autor_id: profile.id })
+
     setSalvando(false)
     if (error) {
-      console.error('Erro ao publicar reconhecimento:', error)
-      setErro(`Não foi possível publicar: ${error.message}`)
+      console.error('Erro ao salvar reconhecimento:', error)
+      setErro(`Não foi possível salvar: ${error.message}`)
       return
     }
-    onCreated(); onClose()
+    onSaved(); onClose()
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content section-card" onClick={e => e.stopPropagation()}>
-        <h3>Lançar reconhecimento</h3>
+        <h3>{reconhecimento ? 'Editar reconhecimento' : 'Lançar reconhecimento'}</h3>
         <form onSubmit={salvar}>
           <div className="input-group">
             <label>Nome do(s) colaborador(es)</label>
@@ -122,17 +161,17 @@ function LancarReconhecimentoModal({ onClose, onCreated, profile }: { onClose: (
             <div className="input-group"><label>Novo cargo / motivo</label><input value={cargoPara} onChange={e => setCargoPara(e.target.value)} required placeholder="Ex: Assistente I de RH" /></div>
           </div>
           <div className="input-group">
-            <label>Foto (opcional)</label>
+            <label>{reconhecimento?.foto_url ? 'Substituir foto' : 'Foto (opcional)'}</label>
             <label className="file-drop">
               <Upload size={18} />
-              <span>{file ? file.name : 'Clique para escolher uma foto'}</span>
+              <span>{file ? file.name : reconhecimento?.foto_url ? 'Já tem uma foto — clique pra trocar' : 'Clique para escolher uma foto'}</span>
               <input type="file" accept="image/*" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
             </label>
           </div>
           {erro && <p className="form-error">{erro}</p>}
           <div className="modal-actions">
             <button type="button" className="btn-ghost" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={salvando}>{salvando ? 'Publicando...' : 'Publicar'}</button>
+            <button type="submit" className="btn-primary" disabled={salvando}>{salvando ? 'Salvando...' : reconhecimento ? 'Salvar alterações' : 'Publicar'}</button>
           </div>
         </form>
       </div>
