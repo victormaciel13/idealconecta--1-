@@ -936,3 +936,10 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   object-fit: contain;
   display: block;
 }
+.foto-ampliada {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.4);
+  cursor: default;
+}

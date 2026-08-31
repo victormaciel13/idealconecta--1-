@@ -13,6 +13,7 @@ export function Reconhecimentos() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editando, setEditando] = useState<any>(null)
+  const [fotoAmpliada, setFotoAmpliada] = useState<string | null>(null)
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -68,7 +69,7 @@ export function Reconhecimentos() {
             const ini = nome.split(' ').filter(Boolean).map((p: string) => p[0]).slice(0, 2).join('')
             return (
               <div key={r.id} className="rec-card section-card">
-                <div className="rec-foto-wrap">
+                <div className="rec-foto-wrap" onClick={() => r.foto_url && setFotoAmpliada(r.foto_url)} style={{ cursor: r.foto_url ? 'pointer' : 'default' }}>
                   {r.foto_url ? (
                     <img src={r.foto_url} alt={nome} className="rec-foto" />
                   ) : (
@@ -100,6 +101,11 @@ export function Reconhecimentos() {
 
       {showModal && <ReconhecimentoModal onClose={() => setShowModal(false)} onSaved={load} profile={profile} />}
       {editando && <ReconhecimentoModal reconhecimento={editando} onClose={() => setEditando(null)} onSaved={load} profile={profile} />}
+      {fotoAmpliada && (
+        <div className="modal-overlay" onClick={() => setFotoAmpliada(null)}>
+          <img src={fotoAmpliada} alt="Foto ampliada" className="foto-ampliada" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   )
 }
