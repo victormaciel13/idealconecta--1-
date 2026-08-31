@@ -916,19 +916,23 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .add-skill-btn:hover { border-color: var(--primary-2); color: var(--primary-2); background: var(--purple-soft); }
 
 .perfis-palette { margin-top: 4px; }
-.rec-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-  max-width: none;
-}
-.rec-card {
+
+.rec-foto-wrap {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex: none;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px;
+  justify-content: center;
+  background: var(--purple-soft);
 }
-.rec-info { flex: 1; min-width: 0; }
-.rec-info b { font-size: 13.5px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rec-move { font-size: 12px !important; }
-.rec-date { font-size: 11px !important; }
+.rec-foto {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
