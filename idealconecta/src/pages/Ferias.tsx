@@ -24,8 +24,18 @@ export function Ferias() {
     setFaltas(faltasRes.data || [])
     setLoading(false)
   }
+
+  // Contagem de dias INCLUSIVA: se a pessoa começa dia 01 e volta a
+  // trabalhar no dia 21, ela ficou de férias nos dias 01 a 20 — ou seja,
+  // início e fim contam os dois como dias de férias. Por isso soma +1
+  // (sem o +1, dava um dia a menos do que devia).
   useEffect(() => {
-    if (inicio && fim) { const d = Math.ceil((new Date(fim).getTime() - new Date(inicio).getTime()) / 86400000); setDias(d > 0 ? d : 0) }
+    if (inicio && fim) {
+      const diff = Math.round((new Date(fim).getTime() - new Date(inicio).getTime()) / 86400000) + 1
+      setDias(diff > 0 ? diff : 0)
+    } else {
+      setDias(0)
+    }
   }, [inicio, fim])
 
   const submit = async (e: React.FormEvent) => {
@@ -43,18 +53,17 @@ export function Ferias() {
 
   const statusColor = (s: string) => s === 'aprovada' ? 'var(--good)' : s === 'rejeitada' ? 'var(--warn)' : 'var(--muted)'
 
-  // Cálculo real do saldo — segue a regra da CLT, incluindo a tabela de
-  // proporcionalidade por faltas injustificadas (Art. 130).
   const aprovadas = lista.filter(f => f.status === 'aprovada')
   const saldo = profile?.data_admissao
     ? calcularSaldoFerias(profile.data_admissao, aprovadas, faltas)
     : null
 
   const fmtData = (d: Date) => d.toLocaleDateString('pt-BR')
-  // O "fim" calculado internamente é o 1º dia do período seguinte (limite
-  // exclusivo, bom pra comparações). Pra EXIBIR pro colaborador, mostramos
-  // o último dia de fato daquele período — um dia antes disso.
   const fmtDataFim = (d: Date) => new Date(d.getTime() - 86400000).toLocaleDateString('pt-BR')
+
+  // Dia em que a pessoa volta ao trabalho — sempre 1 dia depois do
+  // último dia de férias selecionado.
+  const dataRetorno = fim ? new Date(new Date(fim).getTime() + 86400000).toLocaleDateString('pt-BR') : null
 
   return (
     <div className="page">
@@ -119,9 +128,10 @@ export function Ferias() {
               <form onSubmit={submit}>
                 <div className="form-row">
                   <div className="input-group"><label>Início</label><input type="date" value={inicio} onChange={e => setInicio(e.target.value)} required /></div>
-                  <div className="input-group"><label>Fim</label><input type="date" value={fim} onChange={e => setFim(e.target.value)} required /></div>
+                  <div className="input-group"><label>Último dia de férias</label><input type="date" value={fim} onChange={e => setFim(e.target.value)} required /></div>
                 </div>
                 <div className="input-group"><label>Dias calculados</label><input type="number" value={dias} readOnly className="readonly" /></div>
+                {dataRetorno && <p className="text-muted" style={{ fontSize: 13, marginTop: -10, marginBottom: 16 }}>Retorno ao trabalho: <b>{dataRetorno}</b></p>}
                 <div className="input-group"><label>Observações para o gestor</label><textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Opcional" /></div>
                 <button type="submit" className="btn-primary" disabled={dias <= 0}>Enviar solicitação</button>
                 {msg && <p className="form-msg">{msg}</p>}
