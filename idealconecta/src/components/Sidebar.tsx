@@ -1,50 +1,72 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  Home, Megaphone, BookOpen, Briefcase, GraduationCap, Plane,
-  Heart, Image, Award, LogOut, Rocket, Target
+  Home, Megaphone, BookOpen, Briefcase, Target, GraduationCap, Video,
+  Umbrella, Heart, Image as ImageIcon, Award, LogOut, Rocket
 } from 'lucide-react'
 
-const colabLinks = [
-  { to: '/', icon: Home, label: 'Início' },
-  { to: '/comunicados', icon: Megaphone, label: 'Comunicados' },
-  { to: '/politicas', icon: BookOpen, label: 'Políticas e Documentos' },
-  { to: '/cargos', icon: Briefcase, label: 'Descrição de Cargos' },
-  { to: '/pdi', icon: Target, label: 'Meu PDI' },
-  { to: '/treinamentos', icon: GraduationCap, label: 'Treinamentos' },
-  { to: '/ferias', icon: Plane, label: 'Férias e Solicitações' },
-  { to: '/beneficios', icon: Heart, label: 'Benefícios' },
-  { to: '/galeria', icon: Image, label: 'Galeria de Fotos' },
-  { to: '/reconhecimentos', icon: Award, label: 'Reconhecimentos' },
-]
-
 export function Sidebar() {
-  const { signOut } = useAuth()
+  const { profile, signOut } = useAuth()
   const navigate = useNavigate()
-  const handleSignOut = async () => { await signOut(); navigate('/login') }
+
+  const handleLogout = async () => {
+    await signOut()
+    navigate('/login')
+  }
 
   return (
     <aside className="sidebar">
       <div className="brand">
-        <div className="brand-logo-box"><img src="/logo-ideal.png" alt="Ideal Empregos" className="brand-logo-img" /></div>
+        <div className="brand-block">
+          <div className="brand-logo-box"><img src="/logo-ideal.png" alt="Ideal Empregos" className="brand-logo-img" /></div>
+        </div>
       </div>
 
       <nav className="nav-links">
-        {colabLinks.map(l => (
-          <NavLink key={l.to} to={l.to} className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} end={l.to === '/'}>
-            <l.icon size={19} />
-            <span>{l.label}</span>
-          </NavLink>
-        ))}
-        <button className="nav-item" onClick={handleSignOut}>
-          <LogOut size={19} />
-          <span>Sair</span>
-        </button>
+        <NavLink to="/" end className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Home size={18} /><span>Início</span>
+        </NavLink>
+        <NavLink to="/comunicados" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Megaphone size={18} /><span>Comunicados</span>
+        </NavLink>
+        <NavLink to="/politicas" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <BookOpen size={18} /><span>Políticas e Documentos</span>
+        </NavLink>
+        <NavLink to="/cargos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Briefcase size={18} /><span>Descrição de Cargos</span>
+        </NavLink>
+        <NavLink to="/pdi" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Target size={18} /><span>Meu PDI</span>
+        </NavLink>
+        <NavLink to="/treinamentos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <GraduationCap size={18} /><span>Treinamentos</span>
+        </NavLink>
+        <NavLink to="/palestras" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Video size={18} /><span>Palestras</span>
+        </NavLink>
+        <NavLink to="/ferias" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Umbrella size={18} /><span>Férias e Solicitações</span>
+        </NavLink>
+        <NavLink to="/beneficios" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Heart size={18} /><span>Benefícios</span>
+        </NavLink>
+        <NavLink to="/galeria" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <ImageIcon size={18} /><span>Galeria de Fotos</span>
+        </NavLink>
+        <NavLink to="/reconhecimentos" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <Award size={18} /><span>Reconhecimentos</span>
+        </NavLink>
       </nav>
+
+      <div className="sidebar-footer">
+        <button className="nav-item logout-btn" onClick={handleLogout}>
+          <LogOut size={18} /><span>Sair</span>
+        </button>
+      </div>
 
       <div className="sidebar-cta">
         <Rocket size={22} />
-        <b>Ideal<br/>é para toda vida!</b>
+        <b>Ideal<br />é para toda vida!</b>
       </div>
     </aside>
   )
