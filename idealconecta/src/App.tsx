@@ -15,6 +15,7 @@ import { Reconhecimentos } from './pages/Reconhecimentos'
 import { DescricaoCargos } from './pages/DescricaoCargos'
 import { Politicas } from './pages/Politicas'
 import { AprovacaoFerias } from './pages/AprovacaoFerias'
+import { Palestras } from './pages/Palestras'
 import { AdminLogin } from './pages/admin/AdminLogin'
 import { AdminLayout, AdminHome } from './pages/admin/AdminDashboard'
 import { AdminColaboradores } from './pages/admin/AdminColaboradores'
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="reconhecimentos" element={<Reconhecimentos />} />
         <Route path="treinamentos" element={<Treinamentos />} />
         <Route path="treinamentos-acessos" element={<AdminTreinamentoAcessos />} />
+        <Route path="palestras" element={<Palestras />} />
         <Route path="pdi" element={<AdminPDI />} />
         <Route path="galeria" element={<Galeria />} />
         <Route path="politicas" element={<Politicas />} />
@@ -54,6 +56,7 @@ export default function App() {
         <Route path="comunicados" element={<Comunicados />} />
         <Route path="galeria" element={<Galeria />} />
         <Route path="treinamentos" element={<Treinamentos />} />
+        <Route path="palestras" element={<Palestras />} />
         <Route path="reconhecimentos" element={<Reconhecimentos />} />
         <Route path="cargos" element={<DescricaoCargos />} />
         <Route path="pdi" element={<PDIHome />} />
