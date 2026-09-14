@@ -943,3 +943,8 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   box-shadow: 0 20px 60px rgba(0,0,0,.4);
   cursor: default;
 }
+/* Palestras e Treinamentos Internos — vídeos */
+.palestras-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.palestra-card { padding: 0; overflow: hidden; }
+.palestra-video { width: 100%; aspect-ratio: 16 / 9; background: #000; display: block; }
+.palestra-info { display: flex; align-items: flex-start; gap: 8px; padding: 14px 16px; }
