@@ -4,21 +4,18 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import {
   Umbrella, FileText, Edit3, Heart, Megaphone, Image as ImageIcon,
-  BookOpen, Briefcase, GraduationCap, Rocket, Plus, X
+  BookOpen, Briefcase, GraduationCap, Rocket
 } from 'lucide-react'
 import type { Comunicado, Ferias } from '../types'
-import { AdicionarAniversarianteModal } from '../components/AdicionarAniversarianteModal'
-import { AniversarianteDetalheModal } from '../components/AniversarianteDetalheModal'
+import { parseDataLocal } from '../lib/ferias'
 
 export function Dashboard() {
   const { profile } = useAuth()
-  const isAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
   const [comunicados, setComunicados] = useState<Comunicado[]>([])
   const [proximasFerias, setProximasFerias] = useState<Ferias | null>(null)
   const [fotos, setFotos] = useState<any[]>([])
   const [aniversariantes, setAniversariantes] = useState<any[]>([])
-  const [showAddAniv, setShowAddAniv] = useState(false)
   const [anivDetalhe, setAnivDetalhe] = useState<any>(null)
 
   useEffect(() => { loadAll() }, [profile])
@@ -36,21 +33,26 @@ export function Dashboard() {
     }
   }
 
+  // Aniversariantes agora vem direto do cadastro de cada colaborador
+  // (campo "Data de nascimento") — não precisa mais recadastrar nada
+  // todo mês. Basta o RH preencher essa data uma vez na tela de
+  // Colaboradores, e a pessoa aparece automaticamente no mês certo,
+  // todo ano, pra sempre.
   function loadAniversariantes() {
     const mesAtual = new Date().getMonth() + 1
-    supabase.from('aniversariantes').select('*').eq('mes', mesAtual).order('dia')
-      .then(({ data }) => setAniversariantes(data || []))
-  }
-
-  const removerAniversariante = async (id: string) => {
-    if (!confirm('Remover esse aniversariante da lista?')) return
-    await supabase.from('aniversariantes').delete().eq('id', id)
-    loadAniversariantes()
+    supabase.from('colaboradores').select('id, nome, sobrenome, departamento, avatar_url, data_nascimento').eq('ativo', true).not('data_nascimento', 'is', null)
+      .then(({ data }) => {
+        const doMes = (data || []).filter(c => {
+          const d = parseDataLocal(c.data_nascimento)
+          return d.getMonth() + 1 === mesAtual
+        }).sort((a, b) => parseDataLocal(a.data_nascimento).getDate() - parseDataLocal(b.data_nascimento).getDate())
+        setAniversariantes(doMes)
+      })
   }
 
   const tempoDeEmpresa = () => {
     if (!profile?.data_admissao) return '—'
-    const inicio = new Date(profile.data_admissao)
+    const inicio = parseDataLocal(profile.data_admissao)
     const hoje = new Date()
     let anos = hoje.getFullYear() - inicio.getFullYear()
     let meses = hoje.getMonth() - inicio.getMonth()
@@ -58,22 +60,20 @@ export function Dashboard() {
     return `${anos} ano${anos !== 1 ? 's' : ''} e ${meses} ${meses !== 1 ? 'meses' : 'mês'}`
   }
 
-  const ini = (n: string) => n.split(' ').map(p => p[0]).slice(0, 2).join('')
+  const ini = (n: string) => n.split(' ').filter(Boolean).map(p => p[0]).slice(0, 2).join('')
 
   return (
     <div className="page dash-page">
       <div className="dash-layout">
         <div className="dash-main">
-          {/* Hero banner — carrossel real quando há conteúdo pra rotacionar */}
           <HeroCarousel comunicados={comunicados} aniversariantes={aniversariantes} />
 
-          {/* Stat cards */}
           <div className="info-cards-row">
             <div className="info-mini-card">
               <div className="info-mini-icon"><Umbrella size={18} /></div>
               <div><span className="info-mini-label">Meu tempo de empresa</span>
                 <b>{tempoDeEmpresa()}</b>
-                <small>{profile?.data_admissao ? `Data de admissão: ${new Date(profile.data_admissao).toLocaleDateString('pt-BR')}` : 'Admissão não cadastrada'}</small>
+                <small>{profile?.data_admissao ? `Data de admissão: ${parseDataLocal(profile.data_admissao).toLocaleDateString('pt-BR')}` : 'Admissão não cadastrada'}</small>
               </div>
             </div>
             <div className="info-mini-card">
@@ -96,7 +96,6 @@ export function Dashboard() {
             </div>
           </div>
 
-          {/* Comunicados + Galeria */}
           <div className="dash-two-col">
             <section className="section-card">
               <div className="section-head">
@@ -131,7 +130,6 @@ export function Dashboard() {
             </section>
           </div>
 
-          {/* Quick links row */}
           <div className="quick-links-row">
             <button className="quick-link-card" onClick={() => navigate('/politicas')}>
               <BookOpen size={20} /><b>Políticas e Documentos</b>
@@ -151,7 +149,6 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Right rail */}
         <div className="dash-rail">
           <section className="section-card rail-card">
             <h2 className="rail-title">🚀 Acesso rápido</h2>
@@ -165,26 +162,26 @@ export function Dashboard() {
           </section>
 
           <section className="section-card rail-card bday-rail">
-            <div className="section-head">
-              <h2 className="rail-title">🎉 Aniversariantes do mês</h2>
-              {isAdmin && <button className="link-btn" onClick={() => setShowAddAniv(true)}><Plus size={14} /></button>}
-            </div>
+            <h2 className="rail-title">🎉 Aniversariantes do mês</h2>
             {aniversariantes.length === 0 ? (
-              <p className="empty" style={{ fontSize: 13 }}>Nenhum aniversariante cadastrado este mês.</p>
+              <p className="empty" style={{ fontSize: 13 }}>Ninguém com data de nascimento cadastrada faz aniversário esse mês.</p>
             ) : (
               <div className="bday-rail-list">
-                {aniversariantes.map((b) => (
-                  <div key={b.id} className="bday-rail-item" onClick={() => setAnivDetalhe(b)} style={{ cursor: 'pointer' }}>
-                    {b.foto_url ? (
-                      <img src={b.foto_url} alt={b.nome} className="bday-photo" />
-                    ) : (
-                      <div className="bday-av" style={{ background: 'var(--primary-2)' }}>{ini(b.nome)}</div>
-                    )}
-                    <div><b>{b.nome}</b><small>{b.departamento || '—'}</small></div>
-                    <span className="bday-rail-date">{String(b.dia).padStart(2, '0')}/{String(b.mes).padStart(2, '0')}</span>
-                    {isAdmin && <button className="bday-remove" onClick={(e) => { e.stopPropagation(); removerAniversariante(b.id) }}><X size={13} /></button>}
-                  </div>
-                ))}
+                {aniversariantes.map((b) => {
+                  const nomeCompleto = `${b.nome} ${b.sobrenome}`
+                  const dataNasc = parseDataLocal(b.data_nascimento)
+                  return (
+                    <div key={b.id} className="bday-rail-item" onClick={() => setAnivDetalhe(b)} style={{ cursor: 'pointer' }}>
+                      {b.avatar_url ? (
+                        <img src={b.avatar_url} alt={nomeCompleto} className="bday-photo" />
+                      ) : (
+                        <div className="bday-av" style={{ background: 'var(--primary-2)' }}>{ini(nomeCompleto)}</div>
+                      )}
+                      <div><b>{nomeCompleto}</b><small>{b.departamento || '—'}</small></div>
+                      <span className="bday-rail-date">{String(dataNasc.getDate()).padStart(2, '0')}/{String(dataNasc.getMonth() + 1).padStart(2, '0')}</span>
+                    </div>
+                  )
+                })}
               </div>
             )}
             {aniversariantes.length > 0 && <p className="bday-wish">🎉 Parabéns! Desejamos muita saúde e sucesso.</p>}
@@ -198,22 +195,30 @@ export function Dashboard() {
         </div>
       </div>
 
-      {showAddAniv && <AdicionarAniversarianteModal onClose={() => setShowAddAniv(false)} onCreated={loadAniversariantes} />}
       {anivDetalhe && (
-        <AniversarianteDetalheModal
-          aniversariante={anivDetalhe}
-          isAdmin={isAdmin}
-          onClose={() => setAnivDetalhe(null)}
-          onUpdated={() => { loadAniversariantes(); setAnivDetalhe(null) }}
-        />
+        <div className="modal-overlay" onClick={() => setAnivDetalhe(null)}>
+          <div className="modal-content section-card aniv-detalhe" onClick={e => e.stopPropagation()}>
+            {anivDetalhe.avatar_url ? (
+              <img src={anivDetalhe.avatar_url} alt={anivDetalhe.nome} className="aniv-detalhe-foto" />
+            ) : (
+              <div className="aniv-detalhe-avatar">{ini(`${anivDetalhe.nome} ${anivDetalhe.sobrenome}`)}</div>
+            )}
+            <div className="aniv-detalhe-badge">🎉 Aniversário</div>
+            <h3 style={{ marginTop: 10 }}>{anivDetalhe.nome} {anivDetalhe.sobrenome}</h3>
+            <p className="text-muted" style={{ fontSize: 13, margin: '2px 0 4px' }}>{anivDetalhe.departamento || '—'}</p>
+            <p style={{ fontSize: 14.5, lineHeight: 1.6, marginTop: 14 }}>
+              A equipe Ideal Empregos deseja um feliz aniversário para {anivDetalhe.nome}! 🎉 Que seu dia seja repleto de alegria e realizações.
+            </p>
+            <div className="modal-actions">
+              <button type="button" className="btn-primary" onClick={() => setAnivDetalhe(null)}>Fechar</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
-// Carrossel do banner principal — só rotaciona quando há mais de um slide com
-// conteúdo real (comunicado recente, aniversariantes do mês). Com apenas o
-// slide de boas-vindas, os pontinhos nem aparecem.
 function HeroCarousel({ comunicados, aniversariantes }: { comunicados: Comunicado[]; aniversariantes: any[] }) {
   const navigate = useNavigate()
 
@@ -228,10 +233,7 @@ function HeroCarousel({ comunicados, aniversariantes }: { comunicados: Comunicad
 
   const [idx, setIdx] = useState(0)
 
-  useEffect(() => {
-    if (idx >= slides.length) setIdx(0)
-  }, [slides.length, idx])
-
+  useEffect(() => { if (idx >= slides.length) setIdx(0) }, [slides.length, idx])
   useEffect(() => {
     if (slides.length < 2) return
     const t = setInterval(() => setIdx(i => (i + 1) % slides.length), 6000)
@@ -262,7 +264,7 @@ function HeroCarousel({ comunicados, aniversariantes }: { comunicados: Comunicad
         {slide.type === 'aniversario' && (
           <>
             <span className="hero-eyebrow">🎉 Aniversariantes do mês</span>
-            <h1>{slide.data.length === 1 ? slide.data[0].nome : `${slide.data.length} colaboradores fazem aniversário`}</h1>
+            <h1>{slide.data.length === 1 ? `${slide.data[0].nome} ${slide.data[0].sobrenome}` : `${slide.data.length} colaboradores fazem aniversário`}</h1>
             <p>Desejamos muita saúde e sucesso a quem está de aniversário!</p>
             <button className="btn-accent" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Ver na lateral →</button>
           </>

@@ -170,16 +170,43 @@ function EditarColaboradorModal({ colaborador, todos, onClose, onSaved }: { cola
   const [cargo, setCargo] = useState(colaborador.cargo || '')
   const [departamento, setDepartamento] = useState(colaborador.departamento || '')
   const [dataAdmissao, setDataAdmissao] = useState(colaborador.data_admissao || '')
+  const [dataNascimento, setDataNascimento] = useState((colaborador as any).data_nascimento || '')
   const [salario, setSalario] = useState(colaborador.salario_base?.toString() || '')
   const [gestorId, setGestorId] = useState((colaborador as any).gestor_id || '')
   const [salvando, setSalvando] = useState(false); const [erro, setErro] = useState('')
+
+  const [faltas, setFaltas] = useState<any[]>([])
+  const [novaFaltaData, setNovaFaltaData] = useState('')
+  const [novaFaltaMotivo, setNovaFaltaMotivo] = useState('')
+  const [loadingFaltas, setLoadingFaltas] = useState(true)
+
+  useEffect(() => { loadFaltas() }, [])
+  async function loadFaltas() {
+    setLoadingFaltas(true)
+    const { data } = await supabase.from('faltas').select('*').eq('colaborador_id', colaborador.id).eq('tipo', 'injustificada').order('data', { ascending: false })
+    setFaltas(data || [])
+    setLoadingFaltas(false)
+  }
+
+  const registrarFalta = async () => {
+    if (!novaFaltaData) return
+    await supabase.from('faltas').insert({ colaborador_id: colaborador.id, data: novaFaltaData, tipo: 'injustificada', motivo: novaFaltaMotivo || null })
+    setNovaFaltaData(''); setNovaFaltaMotivo('')
+    loadFaltas()
+  }
+
+  const removerFalta = async (id: string) => {
+    await supabase.from('faltas').delete().eq('id', id)
+    loadFaltas()
+  }
 
   const salvar = async (e: React.FormEvent) => {
     e.preventDefault()
     setSalvando(true); setErro('')
     const { error } = await supabase.from('colaboradores').update({
       cargo: cargo || null, departamento: departamento || null,
-      data_admissao: dataAdmissao || null, salario_base: salario ? parseFloat(salario) : null,
+      data_admissao: dataAdmissao || null, data_nascimento: dataNascimento || null,
+      salario_base: salario ? parseFloat(salario) : null,
       gestor_id: gestorId || null,
     }).eq('id', colaborador.id)
     setSalvando(false)
@@ -191,7 +218,7 @@ function EditarColaboradorModal({ colaborador, todos, onClose, onSaved }: { cola
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content section-card" onClick={e => e.stopPropagation()}>
+      <div className="modal-content section-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <h3>Editar {colaborador.nome} {colaborador.sobrenome}</h3>
         <form onSubmit={salvar}>
           <div className="form-row">
@@ -200,8 +227,9 @@ function EditarColaboradorModal({ colaborador, todos, onClose, onSaved }: { cola
           </div>
           <div className="form-row">
             <div className="input-group"><label>Data de admissão</label><input type="date" value={dataAdmissao || ''} onChange={e => setDataAdmissao(e.target.value)} /></div>
-            <div className="input-group"><label>Salário base (R$)</label><input type="number" step="0.01" value={salario} onChange={e => setSalario(e.target.value)} placeholder="Ex: 4500.00" /></div>
+            <div className="input-group"><label>Data de nascimento</label><input type="date" value={dataNascimento || ''} onChange={e => setDataNascimento(e.target.value)} /></div>
           </div>
+          <div className="input-group"><label>Salário base (R$)</label><input type="number" step="0.01" value={salario} onChange={e => setSalario(e.target.value)} placeholder="Ex: 4500.00" /></div>
           <div className="input-group">
             <label>Gestor responsável</label>
             <select value={gestorId} onChange={e => setGestorId(e.target.value)}>
@@ -216,6 +244,29 @@ function EditarColaboradorModal({ colaborador, todos, onClose, onSaved }: { cola
             <button type="submit" className="btn-primary" disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar'}</button>
           </div>
         </form>
+
+        <div style={{ borderTop: '1px solid var(--line-2)', marginTop: 20, paddingTop: 16 }}>
+          <label style={{ fontSize: 13, fontWeight: 700, display: 'block', marginBottom: 8 }}>Faltas injustificadas</label>
+          <p className="text-muted" style={{ fontSize: 12, marginTop: -4, marginBottom: 10 }}>Usadas pra calcular o saldo de férias correto (Art. 130 da CLT).</p>
+
+          {loadingFaltas ? <p className="empty" style={{ fontSize: 13 }}>Carregando...</p> : faltas.length === 0 ? (
+            <p className="text-muted" style={{ fontSize: 12.5, marginBottom: 10 }}>Nenhuma falta registrada.</p>
+          ) : (
+            <div className="skill-tag-list" style={{ marginBottom: 10 }}>
+              {faltas.map(f => (
+                <span key={f.id} className="skill-tag removable" style={{ background: 'var(--error-soft)', color: 'var(--error)' }}>
+                  {new Date(f.data).toLocaleDateString('pt-BR')}{f.motivo ? ` — ${f.motivo}` : ''} <button onClick={() => removerFalta(f.id)}><UserX size={11} /></button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="form-row">
+            <div className="input-group"><label>Data</label><input type="date" value={novaFaltaData} onChange={e => setNovaFaltaData(e.target.value)} /></div>
+            <div className="input-group"><label>Motivo (opcional)</label><input value={novaFaltaMotivo} onChange={e => setNovaFaltaMotivo(e.target.value)} placeholder="Ex: sem justificativa" /></div>
+          </div>
+          <button type="button" className="btn-ghost" disabled={!novaFaltaData} onClick={registrarFalta}>Registrar falta</button>
+        </div>
       </div>
     </div>
   )
