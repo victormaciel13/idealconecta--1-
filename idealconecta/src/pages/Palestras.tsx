@@ -3,13 +3,16 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { Video, Upload, Trash2, Pencil, Link as LinkIcon } from 'lucide-react'
 
-// Reconhece link do YouTube ou Vimeo e monta a URL de embed — usado pra
-// vídeos grandes que não cabem no limite de upload direto do Supabase.
+// Reconhece link do YouTube, Vimeo ou Google Drive e monta a URL de
+// embed — usado pra vídeos grandes que não cabem no limite de upload
+// direto do Supabase.
 function getEmbedUrl(url: string): string | null {
   const yt = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/)
   if (yt) return `https://www.youtube.com/embed/${yt[1]}`
   const vimeo = url.match(/vimeo\.com\/(\d+)/)
   if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}`
+  const drive = url.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/)
+  if (drive) return `https://drive.google.com/file/d/${drive[1]}/preview`
   return null
 }
 
@@ -118,8 +121,8 @@ function PalestraModal({ palestra, onClose, onSaved, profile }: { palestra?: any
     let video_url = palestra?.video_url
 
     if (modo === 'link') {
-      if (!link.trim()) { setErro('Cole o link do vídeo (YouTube ou Vimeo).'); return }
-      if (!getEmbedUrl(link.trim())) { setErro('Esse link não parece ser do YouTube nem do Vimeo. Confira e tente de novo.'); return }
+      if (!link.trim()) { setErro('Cole o link do vídeo (YouTube, Vimeo ou Google Drive).'); return }
+      if (!getEmbedUrl(link.trim())) { setErro('Esse link não parece ser do YouTube, Vimeo nem Google Drive. Confira e tente de novo.'); return }
       video_url = link.trim()
     } else {
       if (!palestra && !file) { setErro('Selecione um arquivo de vídeo.'); return }
@@ -165,7 +168,7 @@ function PalestraModal({ palestra, onClose, onSaved, profile }: { palestra?: any
             <label>Fonte do vídeo</label>
             <div className="seg" style={{ marginBottom: 0 }}>
               <button type="button" className={`seg-btn ${modo === 'arquivo' ? 'active' : ''}`} onClick={() => setModo('arquivo')}>Enviar arquivo</button>
-              <button type="button" className={`seg-btn ${modo === 'link' ? 'active' : ''}`} onClick={() => setModo('link')}>Link do YouTube/Vimeo</button>
+              <button type="button" className={`seg-btn ${modo === 'link' ? 'active' : ''}`} onClick={() => setModo('link')}>Link (YouTube/Vimeo/Drive)</button>
             </div>
           </div>
 
@@ -183,7 +186,7 @@ function PalestraModal({ palestra, onClose, onSaved, profile }: { palestra?: any
             <div className="input-group">
               <label>Link do vídeo</label>
               <div className="input-icon"><LinkIcon size={16} /><input value={link} onChange={e => setLink(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." /></div>
-              <small className="text-muted" style={{ fontSize: 12 }}>Cole o link de um vídeo do YouTube (pode ser "não listado") ou Vimeo. Não tem limite de tamanho.</small>
+              <small className="text-muted" style={{ fontSize: 12 }}>Cole o link de um vídeo do YouTube (pode ser "não listado"), Vimeo, ou Google Drive. No caso do Drive, o arquivo precisa estar compartilhado como "Qualquer pessoa com o link pode visualizar" — senão os colaboradores não conseguem assistir. Não tem limite de tamanho.</small>
             </div>
           )}
 
