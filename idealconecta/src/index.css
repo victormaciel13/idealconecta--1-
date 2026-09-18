@@ -948,3 +948,5 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .palestra-card { padding: 0; overflow: hidden; }
 .palestra-video { width: 100%; aspect-ratio: 16 / 9; background: #000; display: block; }
 .palestra-info { display: flex; align-items: flex-start; gap: 8px; padding: 14px 16px; }
+/* Garante que o iframe de YouTube/Vimeo fique sem borda, igual ao vídeo direto */
+.palestra-video { border: 0; }
