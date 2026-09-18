@@ -4,11 +4,6 @@ import { Upload } from 'lucide-react'
 
 const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
-// Substitui o AdicionarAniversarianteModal que já existe dentro do
-// Dashboard.tsx — cole isso no lugar dele. A diferença principal é que
-// agora, se der erro, mostra a mensagem REAL do Supabase (upload ou
-// banco) em vez de um texto genérico "Não foi possível salvar" — assim
-// dá pra saber exatamente onde está travando.
 export function AdicionarAniversarianteModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [nome, setNome] = useState('')
   const [departamento, setDepartamento] = useState('')

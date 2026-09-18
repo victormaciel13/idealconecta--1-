@@ -8,15 +8,19 @@ import {
 } from 'lucide-react'
 import type { Comunicado, Ferias } from '../types'
 import { parseDataLocal } from '../lib/ferias'
+import { AdicionarAniversarianteModal } from '../components/AdicionarAniversarianteModal'
+import { AniversarianteDetalheModal } from '../components/AniversarianteDetalheModal'
 
 export function Dashboard() {
   const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin'
   const navigate = useNavigate()
   const [comunicados, setComunicados] = useState<Comunicado[]>([])
   const [proximasFerias, setProximasFerias] = useState<Ferias | null>(null)
   const [fotos, setFotos] = useState<any[]>([])
   const [aniversariantes, setAniversariantes] = useState<any[]>([])
   const [anivDetalhe, setAnivDetalhe] = useState<any>(null)
+  const [showAddAniv, setShowAddAniv] = useState(false)
 
   useEffect(() => { loadAll() }, [profile])
 
@@ -33,21 +37,18 @@ export function Dashboard() {
     }
   }
 
-  // Aniversariantes agora vem direto do cadastro de cada colaborador
-  // (campo "Data de nascimento") — não precisa mais recadastrar nada
-  // todo mês. Basta o RH preencher essa data uma vez na tela de
-  // Colaboradores, e a pessoa aparece automaticamente no mês certo,
-  // todo ano, pra sempre.
+  // Aniversariantes cadastrados manualmente (nome, dia/mês, foto,
+  // mensagem) — mostra quem já foi cadastrado pra esse mês específico.
   function loadAniversariantes() {
     const mesAtual = new Date().getMonth() + 1
-    supabase.from('colaboradores').select('id, nome, sobrenome, departamento, avatar_url, data_nascimento').eq('ativo', true).not('data_nascimento', 'is', null)
-      .then(({ data }) => {
-        const doMes = (data || []).filter(c => {
-          const d = parseDataLocal(c.data_nascimento)
-          return d.getMonth() + 1 === mesAtual
-        }).sort((a, b) => parseDataLocal(a.data_nascimento).getDate() - parseDataLocal(b.data_nascimento).getDate())
-        setAniversariantes(doMes)
-      })
+    supabase.from('aniversariantes').select('*').eq('mes', mesAtual).order('dia')
+      .then(({ data }) => setAniversariantes(data || []))
+  }
+
+  const removerAniversariante = async (id: string) => {
+    if (!confirm('Remover esse aniversariante da lista?')) return
+    await supabase.from('aniversariantes').delete().eq('id', id)
+    loadAniversariantes()
   }
 
   const tempoDeEmpresa = () => {
@@ -162,26 +163,26 @@ export function Dashboard() {
           </section>
 
           <section className="section-card rail-card bday-rail">
-            <h2 className="rail-title">🎉 Aniversariantes do mês</h2>
+            <div className="section-head">
+              <h2 className="rail-title">🎉 Aniversariantes do mês</h2>
+              {isAdmin && <button className="link-btn" onClick={() => setShowAddAniv(true)}>+</button>}
+            </div>
             {aniversariantes.length === 0 ? (
-              <p className="empty" style={{ fontSize: 13 }}>Ninguém com data de nascimento cadastrada faz aniversário esse mês.</p>
+              <p className="empty" style={{ fontSize: 13 }}>Nenhum aniversariante cadastrado este mês.</p>
             ) : (
               <div className="bday-rail-list">
-                {aniversariantes.map((b) => {
-                  const nomeCompleto = `${b.nome} ${b.sobrenome}`
-                  const dataNasc = parseDataLocal(b.data_nascimento)
-                  return (
-                    <div key={b.id} className="bday-rail-item" onClick={() => setAnivDetalhe(b)} style={{ cursor: 'pointer' }}>
-                      {b.avatar_url ? (
-                        <img src={b.avatar_url} alt={nomeCompleto} className="bday-photo" />
-                      ) : (
-                        <div className="bday-av" style={{ background: 'var(--primary-2)' }}>{ini(nomeCompleto)}</div>
-                      )}
-                      <div><b>{nomeCompleto}</b><small>{b.departamento || '—'}</small></div>
-                      <span className="bday-rail-date">{String(dataNasc.getDate()).padStart(2, '0')}/{String(dataNasc.getMonth() + 1).padStart(2, '0')}</span>
-                    </div>
-                  )
-                })}
+                {aniversariantes.map((b) => (
+                  <div key={b.id} className="bday-rail-item" onClick={() => setAnivDetalhe(b)} style={{ cursor: 'pointer' }}>
+                    {b.foto_url ? (
+                      <img src={b.foto_url} alt={b.nome} className="bday-photo" />
+                    ) : (
+                      <div className="bday-av" style={{ background: 'var(--primary-2)' }}>{ini(b.nome)}</div>
+                    )}
+                    <div><b>{b.nome}</b><small>{b.departamento || '—'}</small></div>
+                    <span className="bday-rail-date">{String(b.dia).padStart(2, '0')}/{String(b.mes).padStart(2, '0')}</span>
+                    {isAdmin && <button className="bday-remove" onClick={(e) => { e.stopPropagation(); removerAniversariante(b.id) }}><span style={{ fontSize: 14 }}>×</span></button>}
+                  </div>
+                ))}
               </div>
             )}
             {aniversariantes.length > 0 && <p className="bday-wish">🎉 Parabéns! Desejamos muita saúde e sucesso.</p>}
@@ -195,25 +196,14 @@ export function Dashboard() {
         </div>
       </div>
 
+      {showAddAniv && <AdicionarAniversarianteModal onClose={() => setShowAddAniv(false)} onCreated={loadAniversariantes} />}
       {anivDetalhe && (
-        <div className="modal-overlay" onClick={() => setAnivDetalhe(null)}>
-          <div className="modal-content section-card aniv-detalhe" onClick={e => e.stopPropagation()}>
-            {anivDetalhe.avatar_url ? (
-              <img src={anivDetalhe.avatar_url} alt={anivDetalhe.nome} className="aniv-detalhe-foto" />
-            ) : (
-              <div className="aniv-detalhe-avatar">{ini(`${anivDetalhe.nome} ${anivDetalhe.sobrenome}`)}</div>
-            )}
-            <div className="aniv-detalhe-badge">🎉 Aniversário</div>
-            <h3 style={{ marginTop: 10 }}>{anivDetalhe.nome} {anivDetalhe.sobrenome}</h3>
-            <p className="text-muted" style={{ fontSize: 13, margin: '2px 0 4px' }}>{anivDetalhe.departamento || '—'}</p>
-            <p style={{ fontSize: 14.5, lineHeight: 1.6, marginTop: 14 }}>
-              A equipe Ideal Empregos deseja um feliz aniversário para {anivDetalhe.nome}! 🎉 Que seu dia seja repleto de alegria e realizações.
-            </p>
-            <div className="modal-actions">
-              <button type="button" className="btn-primary" onClick={() => setAnivDetalhe(null)}>Fechar</button>
-            </div>
-          </div>
-        </div>
+        <AniversarianteDetalheModal
+          aniversariante={anivDetalhe}
+          isAdmin={isAdmin}
+          onClose={() => setAnivDetalhe(null)}
+          onUpdated={() => { loadAniversariantes(); setAnivDetalhe(null) }}
+        />
       )}
     </div>
   )
